@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数独 Sudoku</title>
+  <script src="../shared/theme.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <h1>数独</h1>
+      <div class="controls">
+        <div class="difficulty" id="difficulty" role="group" aria-label="难度选择">
+          <button class="diff-btn active" data-difficulty="easy">简单</button>
+          <button class="diff-btn" data-difficulty="medium">中等</button>
+          <button class="diff-btn" data-difficulty="hard">困难</button>
+        </div>
+        <button id="newGame" class="primary">新游戏</button>
+        <div class="timer" id="timer">00:00</div>
+        <button id="themeBtn" class="theme-btn" title="切换深浅色主题" aria-label="切换深浅色主题">🌙</button>
+      </div>
+    </header>
+
+    <div class="board" id="board" role="grid" aria-label="数独棋盘"></div>
+
+    <div class="toolbar">
+      <button id="undoBtn" class="tool" title="撤销（Ctrl/⌘+Z）">撤销</button>
+      <button id="redoBtn" class="tool" title="重做（Ctrl/⌘+Shift+Z）">重做</button>
+      <button id="hintBtn" class="tool" title="揭示一格正确答案（H）">提示</button>
+      <button id="notesBtn" class="tool" title="铅笔笔记模式开关（N）">笔记</button>
+    </div>
+
+    <div class="numpad" id="numpad">
+      <button class="num" data-num="1">1</button>
+      <button class="num" data-num="2">2</button>
+      <button class="num" data-num="3">3</button>
+      <button class="num" data-num="4">4</button>
+      <button class="num" data-num="5">5</button>
+      <button class="num" data-num="6">6</button>
+      <button class="num" data-num="7">7</button>
+      <button class="num" data-num="8">8</button>
+      <button class="num" data-num="9">9</button>
+      <button class="num erase" data-num="0" aria-label="擦除">擦除</button>
+    </div>
+
+    <p class="hint">点击选格，键盘 1–9 填数，Backspace 擦除，方向键移动；笔记模式（N）下按数字记铅笔小字；H 提示一格，Ctrl/⌘+Z 撤销；数字集齐 9 个后键盘置灰；进度自动保存，刷新页面接着玩；切换难度开新局。</p>
+  </main>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="card">
+      <h2>🎉 通关成功</h2>
+      <p id="overlayText">用时 00:00</p>
+      <button class="primary" id="again">再来一局</button>
+    </div>
+  </div>
+
+  <script src="sudoku.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

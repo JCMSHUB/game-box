@@ -1,0 +1,354 @@
+/* 数独页面样式：支持浅色/深色主题。
+   index.html 头部的内联脚本会在渲染前把 data-theme 设到 <html> 上，避免刷新闪色。 */
+
+:root {
+  color-scheme: light;
+
+  --bg: #f4f4f5;
+  --surface: #ffffff;        /* 棋盘、按钮、键盘的底色 */
+  --surface-hover: #ececf1;
+  --line: #d4d4d8;
+  --strong: #3f3f46;         /* 3×3 宫粗线 */
+  --text: #18181b;
+  --muted: #71717a;
+  --user: #2563eb;           /* 用户填的数字 */
+  --wrong: #dc2626;          /* 填错的数字 */
+  --peer: #e0e7ff;           /* 选中格同行/列/宫 */
+  --same: #c7d2fe;           /* 与选中格相同的数字 */
+  --selected: #93c5fd;
+  --selected-ring: #2563eb;
+  --primary: #2563eb;
+  --card: #ffffff;           /* 通关弹层卡片 */
+  --mask: rgba(24, 24, 27, 0.5);
+  --board-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #131316;
+  --surface: #1e1e24;
+  --surface-hover: #2b2b33;
+  --line: #35353d;
+  --strong: #6e6e77;
+  --text: #f4f4f5;
+  --muted: #a0a0ab;
+  --user: #60a5fa;
+  --wrong: #f87171;
+  --peer: #232c40;
+  --same: #2b3654;
+  --selected: #1e3a5f;
+  --selected-ring: #60a5fa;
+  --primary: #3b82f6;
+  --card: #222228;
+  --mask: rgba(0, 0, 0, 0.6);
+  --board-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  display: flex;
+  justify-content: center;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* 主题切换时的颜色过渡 */
+.board, .cell, .num, .tool, .diff-btn, .theme-btn, .difficulty, .card {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.wrap {
+  width: min(94vw, 480px);
+  padding: 20px 0 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ---------- 顶栏 ---------- */
+
+.topbar {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0 auto 0 0;
+  letter-spacing: 4px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.difficulty {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.diff-btn {
+  border: none;
+  background: transparent;
+  padding: 7px 12px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.diff-btn + .diff-btn { border-left: 1px solid var(--line); }
+
+.diff-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+button.primary {
+  border: none;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button.primary:hover { filter: brightness(1.15); }
+
+.timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  color: var(--muted);
+  min-width: 52px;
+  text-align: center;
+}
+
+.theme-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 5px 9px;
+  font-size: 15px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.theme-btn:hover { background: var(--surface-hover); }
+
+/* ---------- 棋盘 ---------- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--surface);
+  border: 2px solid var(--strong);
+  border-radius: 4px;
+  overflow: hidden;
+  user-select: none;
+  touch-action: manipulation;
+  box-shadow: var(--board-shadow);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(18px, 5vw, 26px);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.cell.last-col { border-right: none; }
+.cell.last-row { border-bottom: none; }
+
+/* 3×3 宫的分隔粗线 */
+.cell.sep-r { border-right: 2px solid var(--strong); }
+.cell.sep-b { border-bottom: 2px solid var(--strong); }
+
+.cell.given { color: var(--text); font-weight: 700; }
+.cell.user { color: var(--user); }
+.cell.wrong { color: var(--wrong); }
+
+/* 选中格所在行/列/宫淡色底 */
+.cell.peer { background: var(--peer); }
+/* 与选中格数字相同的格子 */
+.cell.same { background: var(--same); }
+/* 写在最后，保证选中格的高亮盖过 peer/same */
+.cell.selected {
+  background: var(--selected);
+  box-shadow: inset 0 0 0 2px var(--selected-ring);
+}
+
+/* 提示揭示的那一格闪一下 */
+@keyframes hint-pulse {
+  0% { background: #fde68a; }
+  100% { background: transparent; }
+}
+
+.cell.hinted { animation: hint-pulse 1s ease-out; }
+
+/* 格子里的铅笔笔记：3×3 的小字 */
+.notes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+  padding: 1px;
+}
+
+.notes span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(8px, 2vw, 11px);
+  line-height: 1;
+  color: var(--muted);
+}
+
+/* ---------- 通关波浪动画（扫雷式的彩色数字闪动） ----------
+   app.js 会给每个格子设置 --flash（按数字取扫雷配色）和 animation-delay
+   （按 行+列 递增，形成从左上到右下的波浪）。 */
+
+.board.win .cell {
+  animation: win-pop 0.55s ease-out both;
+}
+
+@keyframes win-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+    background: var(--flash, #fbbf24);
+    box-shadow: 0 0 14px var(--flash, #fbbf24);
+  }
+  100% {
+    transform: scale(1);
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+/* ---------- 工具栏（撤销/重做/提示/笔记） ---------- */
+
+.toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.tool {
+  padding: 9px 0;
+  font-size: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tool:hover { background: var(--surface-hover); color: var(--text); }
+
+.tool.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tool:disabled:hover { background: var(--surface); color: var(--muted); }
+
+/* ---------- 数字键盘 ---------- */
+
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.num {
+  padding: 12px 0;
+  font-size: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.2s, background-color 0.25s ease, color 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.num:hover { background: var(--peer); }
+
+.num.erase {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* 数字在棋盘上集齐 9 个 → 置灰、不可点击 */
+.num.done {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.num.done:hover { background: var(--surface); }
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin: 0;
+  line-height: 1.8;
+}
+
+/* ---------- 通关弹层 ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--mask);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay.hidden { display: none; }
+
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 30px 40px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.card h2 { margin: 0 0 10px; font-size: 20px; }
+.card p { margin: 0 0 18px; color: var(--muted); }

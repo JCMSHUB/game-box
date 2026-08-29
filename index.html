@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>游戏盒子</title>
+  <script src="shared/theme.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f4f5;
+      --surface: #ffffff;
+      --line: #d4d4d8;
+      --text: #18181b;
+      --muted: #71717a;
+      --primary: #2563eb;
+      --hover-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #131316;
+      --surface: #1e1e24;
+      --line: #35353d;
+      --text: #f4f4f5;
+      --muted: #a0a0ab;
+      --primary: #3b82f6;
+      --hover-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      display: flex;
+      justify-content: center;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    .wrap {
+      width: min(92vw, 760px);
+      padding: 40px 0 60px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      font-size: 26px;
+      margin: 0 auto 0 0;
+      letter-spacing: 2px;
+    }
+
+    .theme-btn {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 6px 10px;
+      font-size: 15px;
+      line-height: 1.4;
+      cursor: pointer;
+    }
+
+    .games {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease,
+        border-color 0.15s ease, background-color 0.25s ease;
+    }
+
+    a.card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--hover-shadow);
+      border-color: var(--primary);
+    }
+
+    .card .icon { font-size: 34px; line-height: 1; }
+    .card h2 { margin: 12px 0 6px; font-size: 17px; }
+    .card p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+    .card.add {
+      border-style: dashed;
+      opacity: 0.65;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>🎮 游戏盒子</h1>
+      <button id="themeBtn" class="theme-btn" title="切换深浅色主题" aria-label="切换深浅色主题">🌙</button>
+    </header>
+
+    <section class="games">
+      <a class="card" href="sudoku/">
+        <div class="icon">🔢</div>
+        <h2>数独</h2>
+        <p>三档难度 · 铅笔笔记 · 提示 · 撤销/重做 · 进度自动保存 · 深浅色主题</p>
+      </a>
+
+      <div class="card add">
+        <div class="icon">🧩</div>
+        <h2>敬请期待</h2>
+        <p>五子棋正在路上</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    window.syncThemeLabel();
+    document.getElementById('themeBtn').addEventListener('click', function () {
+      window.toggleGameboxTheme();
+      window.syncThemeLabel();
+    });
+  </script>
+</body>
+</html>
