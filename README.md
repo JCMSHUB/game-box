@@ -10,10 +10,16 @@ game-box/
 ├── index.html      # 盒子首页（游戏入口卡片）
 ├── shared/
 │   └── theme.js    # 共享的深浅色主题脚本（各游戏统一引入）
-└── sudoku/         # 数独
+├── sudoku/         # 数独
+│   ├── index.html
+│   ├── style.css
+│   ├── sudoku.js   # 核心算法（求解器 + 出题器），不依赖 DOM
+│   ├── app.js      # 界面与交互
+│   └── test.js     # 算法自测：node test.js
+└── gomoku/         # 五子棋
     ├── index.html
     ├── style.css
-    ├── sudoku.js   # 核心算法（求解器 + 出题器），不依赖 DOM
+    ├── gomoku.js   # 核心算法（胜负判定 + AI 走子），不依赖 DOM
     ├── app.js      # 界面与交互
     └── test.js     # 算法自测：node test.js
 ```
@@ -39,5 +45,5 @@ python3 -m http.server 8763 --directory game-box
 ## 路线图
 
 - [x] 数独：三档难度、铅笔笔记、撤销/重做、提示、进度自动保存、深浅色主题、通关动画
-- [ ] 五子棋
+- [x] 五子棋：人机/双人对战、三档 AI、悔棋/重做、提示、进度自动保存、深浅色主题
 - [ ] 战绩统计（各游戏通用）

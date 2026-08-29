@@ -1,0 +1,361 @@
+/* 五子棋页面样式：支持浅色/深色主题。
+   index.html 头部的内联脚本会在渲染前把 data-theme 设到 <html> 上，避免刷新闪色。 */
+
+:root {
+  color-scheme: light;
+
+  --bg: #f4f4f5;
+  --surface: #ffffff;        /* 棋盘、按钮的底色 */
+  --surface-hover: #ececf1;
+  --line: #d4d4d8;           /* 棋盘细网格线 */
+  --strong: #3f3f46;         /* 棋盘外框粗线 / 星位 */
+  --text: #18181b;
+  --muted: #71717a;
+  --primary: #2563eb;
+  --last-black-dot: #f8fafc; /* 黑子上最后一手标记 */
+  --last-white-dot: #334155; /* 白子上最后一手标记 */
+  --hover-stone: rgba(24, 24, 27, 0.4);   /* 悬停预览的黑子 */
+  --win-glow: rgba(251, 191, 36, 0.65);   /* 获胜连线光晕 */
+  --hint-flash: #fde68a;
+  --card: #ffffff;           /* 胜负弹层卡片 */
+  --mask: rgba(24, 24, 27, 0.5);
+  --board-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #131316;
+  --surface: #1e1e24;
+  --surface-hover: #2b2b33;
+  --line: #35353d;
+  --strong: #6e6e77;
+  --text: #f4f4f5;
+  --muted: #a0a0ab;
+  --primary: #3b82f6;
+  --last-black-dot: #f8fafc;
+  --last-white-dot: #334155;
+  --hover-stone: rgba(244, 244, 245, 0.35);
+  --win-glow: rgba(251, 191, 36, 0.7);
+  --hint-flash: #a16207;
+  --card: #222228;
+  --mask: rgba(0, 0, 0, 0.6);
+  --board-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  display: flex;
+  justify-content: center;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* 主题切换时的颜色过渡 */
+.board, .cell, .tool, .diff-btn, .theme-btn, .difficulty, .card, .status {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.wrap {
+  width: min(94vw, 560px);
+  padding: 20px 0 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ---------- 顶栏 ---------- */
+
+.topbar {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0 auto 0 0;
+  letter-spacing: 4px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.difficulty {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.diff-btn {
+  border: none;
+  background: transparent;
+  padding: 7px 12px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.diff-btn + .diff-btn { border-left: 1px solid var(--line); }
+
+.diff-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* 双人模式下 AI 难度整组禁用 */
+.difficulty.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+button.primary {
+  border: none;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button.primary:hover { filter: brightness(1.15); }
+
+.timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  color: var(--muted);
+  min-width: 52px;
+  text-align: center;
+}
+
+.theme-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 5px 9px;
+  font-size: 15px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.theme-btn:hover { background: var(--surface-hover); }
+
+/* ---------- 状态行 ---------- */
+
+.status {
+  min-height: 20px;
+  font-size: 14px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+}
+
+/* 状态行里的小棋子图标 */
+.dot {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  margin-right: 7px;
+}
+
+.dot.black {
+  background: radial-gradient(circle at 35% 30%, #5c5c66, #141418 70%);
+}
+
+.dot.white {
+  background: radial-gradient(circle at 35% 30%, #ffffff, #d7d8de 75%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+/* ---------- 棋盘 ---------- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--surface);
+  border: 2px solid var(--strong);
+  border-radius: 4px;
+  overflow: hidden;
+  user-select: none;
+  touch-action: manipulation;
+  box-shadow: var(--board-shadow);
+}
+
+.cell {
+  position: relative;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.cell.last-col { border-right: none; }
+.cell.last-row { border-bottom: none; }
+
+/* 轮到 AI / 已结束时不可点 */
+.board.locked .cell { cursor: default; }
+
+/* 星位：四角星 + 天元 */
+.cell.star {
+  background-image: radial-gradient(circle, var(--strong) 0, var(--strong) 1.5px, transparent 1.6px);
+}
+
+/* 棋子：径向渐变画出立体感 */
+.cell.black::before,
+.cell.white::before {
+  content: '';
+  position: absolute;
+  inset: 11%;
+  border-radius: 50%;
+}
+
+.cell.black::before {
+  background: radial-gradient(circle at 35% 30%, #5c5c66, #141418 70%);
+}
+
+.cell.white::before {
+  background: radial-gradient(circle at 35% 30%, #ffffff, #d7d8de 75%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* 最后一手标记：棋子中心的小圆点 */
+.cell.last::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20%;
+  height: 20%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+.cell.last.black::after { background: var(--last-black-dot); }
+.cell.last.white::after { background: var(--last-white-dot); }
+
+/* 悬停预览：轮到谁走就显示谁的半透明子（仅空格） */
+.board.turn-black .cell.empty:hover::after,
+.board.turn-white .cell.empty:hover::after {
+  content: '';
+  position: absolute;
+  inset: 11%;
+  border-radius: 50%;
+}
+
+.board.turn-black .cell.empty:hover::after { background: var(--hover-stone); }
+.board.turn-white .cell.empty:hover::after {
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+/* 提示推荐的落点闪一下 */
+@keyframes hint-pulse {
+  0% { background-color: var(--hint-flash); }
+  100% { background-color: transparent; }
+}
+
+.cell.hinted { animation: hint-pulse 1s ease-out; }
+
+/* ---------- 获胜连线动画 ----------
+   app.js 给连线上的每格设置 animation-delay（按连线顺序递增），
+   棋子逐个弹起并带上金色光晕，动画结束后保留静态光晕标出五连。 */
+
+.cell.win-line::before {
+  box-shadow: 0 0 9px 2px var(--win-glow);
+}
+
+.board.win .cell.win-line::before {
+  animation: win-pulse 0.55s ease-out both;
+}
+
+@keyframes win-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.28);
+    box-shadow: 0 0 18px 6px var(--win-glow);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 9px 2px var(--win-glow);
+  }
+}
+
+/* ---------- 工具栏（悔棋/重做/提示） ---------- */
+
+.toolbar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.tool {
+  padding: 9px 0;
+  font-size: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tool:hover { background: var(--surface-hover); color: var(--text); }
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tool:disabled:hover { background: var(--surface); color: var(--muted); }
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin: 0;
+  line-height: 1.8;
+}
+
+/* ---------- 胜负弹层 ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--mask);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay.hidden { display: none; }
+
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 30px 40px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.card h2 { margin: 0 0 10px; font-size: 20px; }
+.card p { margin: 0 0 18px; color: var(--muted); }

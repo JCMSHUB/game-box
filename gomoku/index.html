@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>五子棋 Gomoku</title>
+  <script src="../shared/theme.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <h1>五子棋</h1>
+      <div class="controls">
+        <div class="difficulty" id="modeGroup" role="group" aria-label="对战模式选择">
+          <button class="diff-btn active" data-mode="pve">人机</button>
+          <button class="diff-btn" data-mode="pvp">双人</button>
+        </div>
+        <div class="difficulty" id="diffGroup" role="group" aria-label="AI 难度选择">
+          <button class="diff-btn" data-difficulty="easy">简单</button>
+          <button class="diff-btn active" data-difficulty="medium">中等</button>
+          <button class="diff-btn" data-difficulty="hard">困难</button>
+        </div>
+        <button id="newGame" class="primary">新游戏</button>
+        <div class="timer" id="timer">00:00</div>
+        <button id="themeBtn" class="theme-btn" title="切换深浅色主题" aria-label="切换深浅色主题">🌙</button>
+      </div>
+    </header>
+
+    <div class="status" id="status"></div>
+
+    <div class="board" id="board" role="grid" aria-label="五子棋棋盘"></div>
+
+    <div class="toolbar">
+      <button id="undoBtn" class="tool" title="悔棋（Ctrl/⌘+Z）">悔棋</button>
+      <button id="redoBtn" class="tool" title="重做（Ctrl/⌘+Shift+Z）">重做</button>
+      <button id="hintBtn" class="tool" title="AI 推荐一个好点（H）">提示</button>
+    </div>
+
+    <p class="hint">点击空位落子，黑方先行；人机模式你执黑，AI 执白。悔棋在人机模式一次退两步（含 AI 那手）；提示（H）用 AI 推荐一个好点，仅供参考；进度自动保存，刷新接着下；切换模式或难度开新局。</p>
+  </main>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="card">
+      <h2 id="overlayTitle">🎉 黑方获胜</h2>
+      <p id="overlayText">用时 00:00</p>
+      <button class="primary" id="again">再来一局</button>
+    </div>
+  </div>
+
+  <script src="gomoku.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
