@@ -116,6 +116,102 @@ for (const diff of ['medium', 'hard']) {
 // ---------- AI 互弈冒烟 ----------
 
 // 各种难度组合对弈：每步必须落在空点，终局判定与最后一手一致，且能在盘满前结束
+// ---------- 棋型打分（窗口扫描） ----------
+
+const S = Gomoku.SCORE;
+
+// 在第 7 行摆放黑子/白子，评估某个空点的四方向总分。
+// 横向棋型为主导，纵向/斜向只有零散活一（每个 30 分）的底噪。
+function rowFixture(stones, evalCol) {
+  const board = Gomoku.createBoard();
+  for (const [r, c, v] of stones) set(board, r, c, v);
+  return Gomoku.pointScore(board, pos(7, evalCol), 1);
+}
+
+const noop = (n) => n >= S.LIVE_ONE && n < S.LIVE_ONE * 10; // 只有底噪
+
+{
+  // 活四点：活三延伸一手成活四（两端空）
+  const liveFour = rowFixture([[7, 5, 1], [7, 6, 1], [7, 7, 1]], 8);
+  if (liveFour < S.LIVE_FOUR || liveFour >= S.LIVE_FOUR * 2) throw new Error(`活四点评分错误: ${liveFour}`);
+
+  // 跳活三缺口点：●●_● 缺口落子直接成活四
+  const jumpThreeGap = rowFixture([[7, 5, 1], [7, 6, 1], [7, 8, 1]], 7);
+  if (jumpThreeGap < S.LIVE_FOUR || jumpThreeGap >= S.LIVE_FOUR * 2) throw new Error(`跳活三缺口评分错误: ${jumpThreeGap}`);
+
+  // 冲四点：眠三延伸（一端被堵）只能成冲四
+  const rushFour = rowFixture([[7, 4, 2], [7, 5, 1], [7, 6, 1], [7, 7, 1]], 8);
+  if (rushFour < S.RUSH_FOUR || rushFour >= S.LIVE_FOUR) throw new Error(`冲四点评分错误: ${rushFour}`);
+
+  // 跳冲四点：●●_●● 分开两格的形状，落子后留一个成五点
+  const jumpFour = rowFixture([[7, 5, 1], [7, 6, 1], [7, 9, 1], [7, 10, 1]], 7);
+  if (jumpFour < S.RUSH_FOUR || jumpFour >= S.LIVE_FOUR) throw new Error(`跳冲四点评分错误: ${jumpFour}`);
+
+  // 活三点：活二延伸成活三
+  const liveThree = rowFixture([[7, 5, 1], [7, 6, 1]], 7);
+  if (liveThree < S.LIVE_THREE || liveThree >= S.RUSH_FOUR) throw new Error(`活三点评分错误: ${liveThree}`);
+
+  // 眠三点：二子另一端被堵，延伸只能成眠三
+  const sleepThree = rowFixture([[7, 5, 1], [7, 6, 1], [7, 8, 2]], 7);
+  if (sleepThree < S.SLEEP_THREE || sleepThree >= S.LIVE_THREE) throw new Error(`眠三点评分错误: ${sleepThree}`);
+
+  // 死子：四方向全被堵死 ≈ 0 分
+  const dead = rowFixture(
+    [[7, 5, 1], [7, 6, 2], [7, 8, 2], [6, 7, 2], [8, 7, 2], [6, 6, 2], [8, 8, 2], [6, 8, 2], [8, 6, 2]], 7);
+  if (dead !== 0) throw new Error(`死子评分应为 0: ${dead}`);
+
+  // 棋型相对次序：活四 > 冲四 > 活三 > 眠三 > 活二
+  if (!(S.LIVE_FOUR > S.RUSH_FOUR && S.RUSH_FOUR > S.LIVE_THREE &&
+        S.LIVE_THREE > S.SLEEP_THREE && S.SLEEP_THREE > S.LIVE_TWO)) {
+    throw new Error('棋型分值相对次序错误');
+  }
+  checked += 8;
+}
+
+// ---------- 跳三封堵 ----------
+
+// 对方跳三 ●●_●：中/困难要优先堵缺口（堵缺口=堵住对方未来的活四点）
+for (const diff of ['medium', 'hard']) {
+  const board = Gomoku.createBoard();
+  for (const c of [5, 6, 8]) set(board, 7, c, 1);
+  set(board, 3, 3, 2); // 白棋远处散子
+  const mv = Gomoku.findBestMove(board, 2, diff, seeded(5));
+  if (mv !== pos(7, 7)) throw new Error(`${diff} 未堵跳三缺口（下了 ${mv}）`);
+  checked++;
+}
+
+// ---------- 实战力：组合必胜局面 ----------
+
+// 白棋有活三 + 可成跳活四的拆三点，双威胁必胜；
+// 对手用「只堵成五点」的简单策略防守，困难档必须在限定手数内取胜。
+{
+  const board = Gomoku.createBoard();
+  // 黑棋远处散子（5 子保持先后手合法）
+  for (const [r, c] of [[2, 2], [2, 12], [12, 2], [12, 12], [6, 12]]) set(board, r, c, 1);
+  // 白棋活三（第 9 行）
+  for (const c of [5, 6, 7]) set(board, 9, c, 2);
+  // 白棋可成跳活四的三个子（第 5 行，缺口在 c6）
+  for (const c of [4, 5, 7]) set(board, 5, c, 2);
+
+  const rng = seeded(6);
+  let player = 2, win = null, plies = 0;
+
+  while (plies < 40) {
+    const diff = player === 2 ? 'hard' : 'easy';
+    const mv = Gomoku.findBestMove(board, player, diff, rng);
+    if (mv < 0) break;
+    board[mv] = player;
+    win = Gomoku.checkWin(board, mv);
+    if (win) break;
+    player = 3 - player;
+    plies++;
+  }
+
+  if (!win || win.winner !== 2) throw new Error('困难档未在双威胁局面取胜');
+  if (plies > 12) throw new Error(`取胜手数过多: ${plies}`);
+  checked++;
+}
+
 console.time('AI 互弈 15 局');
 const combos = [
   ['easy', 'medium'], ['medium', 'hard'], ['hard', 'easy'],

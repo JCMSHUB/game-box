@@ -20,15 +20,19 @@
   // 棋型分值表。保证相对次序：成五 > 堵对方成五 > 活四 > 冲四 > 活三 > 眠三 > 活二…
   // 同一格的多方向分值直接相加，这样双活三、冲四带活三这类组合威胁会自然冒尖。
   var SCORE = {
-    FIVE: 10000000,    // 连五（已成）
+    FIVE: 10000000,      // 连五（已成）
     LIVE_FOUR: 1000000,  // 活四：两端都空
     RUSH_FOUR: 100000,   // 冲四：一端被堵，仍有一手成五
-    LIVE_THREE: 50000,   // 活三：两端都空，下一手成活四
-    SLEEP_THREE: 2000,   // 眠三
-    LIVE_TWO: 3000,      // 活二
-    SLEEP_TWO: 500,      // 眠二
-    LIVE_ONE: 100,       // 活一
+    LIVE_THREE: 50000,   // 活三：下一手能成活四
+    SLEEP_THREE: 2000,   // 眠三：下一手只能成冲四
+    LIVE_TWO: 800,       // 活二
+    SLEEP_TWO: 100,      // 眠二
+    LIVE_ONE: 30,        // 活一
   };
+
+  // 防守权重：对方在同一个点落子的威胁分按此折扣计入我方评估，
+  // 使得「自己成活四」优先于「堵对方活四」，但堵成五仍优先于自己活四。
+  var DEFENSE = 0.9;
 
   var DIFFICULTY = {
     easy: { label: '简单' },
@@ -82,7 +86,69 @@
     return true;
   }
 
-  // ---------- AI ----------
+  // ---------- 打分：窗口扫描 ----------
+
+  /**
+   * 棋型模式表，按分值从高到低排列，命中即返回该分值（首个匹配生效，
+   * 所以高分棋型优先；'011110' 里虽然也含 '11110'，但活四先查）。
+   * 含跳棋型：跳四 11011 等、跳活三 010110/011010 等。
+   */
+  var PATTERNS = [
+    ['11111', SCORE.FIVE],
+    ['011110', SCORE.LIVE_FOUR],
+    ['01111', SCORE.RUSH_FOUR], ['11110', SCORE.RUSH_FOUR],
+    ['11011', SCORE.RUSH_FOUR], ['10111', SCORE.RUSH_FOUR], ['11101', SCORE.RUSH_FOUR],
+    ['011100', SCORE.LIVE_THREE], ['001110', SCORE.LIVE_THREE],
+    ['010110', SCORE.LIVE_THREE], ['011010', SCORE.LIVE_THREE],
+    ['211100', SCORE.SLEEP_THREE], ['001112', SCORE.SLEEP_THREE],
+    ['211010', SCORE.SLEEP_THREE], ['010112', SCORE.SLEEP_THREE],
+    ['210110', SCORE.SLEEP_THREE], ['011012', SCORE.SLEEP_THREE],
+    ['10011', SCORE.SLEEP_THREE], ['11001', SCORE.SLEEP_THREE], ['10101', SCORE.SLEEP_THREE],
+    ['001100', SCORE.LIVE_TWO], ['010100', SCORE.LIVE_TWO],
+    ['001010', SCORE.LIVE_TWO], ['011000', SCORE.LIVE_TWO], ['000110', SCORE.LIVE_TWO],
+    ['211000', SCORE.SLEEP_TWO], ['000112', SCORE.SLEEP_TWO],
+    ['210100', SCORE.SLEEP_TWO], ['001012', SCORE.SLEEP_TWO],
+    ['10001', SCORE.SLEEP_TWO],
+    ['010', SCORE.LIVE_ONE],
+  ];
+
+  /**
+   * 假设 player 在 i 点落子，取该方向上以 i 为中心的前后各 4 格窗口，
+   * 映射成 9 字符串（'1'=己方 '2'=对方 '0'=空 '#'=出界，中心视为己方），
+   * 按模式表取最高匹配棋型的分值。
+   * 经过该点的所有棋型（连五跨度 5、活四跨度 6、跳活三跨度 6…）都落在 9 格窗口内。
+   */
+  function lineScore(board, i, player, dr, dc) {
+    var r0 = (i / SIZE) | 0, c0 = i % SIZE;
+    var s = '';
+    for (var k = -4; k <= 4; k++) {
+      if (k === 0) { s += '1'; continue; }
+      var r = r0 + dr * k, c = c0 + dc * k;
+      if (!inBoard(r, c)) { s += '#'; continue; }
+      var v = board[idx(r, c)];
+      s += v === 0 ? '0' : (v === player ? '1' : '2');
+    }
+    for (var p = 0; p < PATTERNS.length; p++) {
+      if (s.indexOf(PATTERNS[p][0]) !== -1) return PATTERNS[p][1];
+    }
+    return 0; // 四个方向全被堵死
+  }
+
+  /** 假设 player 在 i 落子后的四方向棋型总分（进攻视角）。 */
+  function pointScore(board, i, player) {
+    var total = 0;
+    for (var d = 0; d < 4; d++) {
+      total += lineScore(board, i, player, DIRECTIONS[d][0], DIRECTIONS[d][1]);
+    }
+    return total;
+  }
+
+  /** 综合评估在 i 落子的价值：己方进攻分 + 对方在此落子的威胁分 × 防守权重。 */
+  function gain(board, i, player) {
+    return pointScore(board, i, player) + DEFENSE * pointScore(board, i, 3 - player);
+  }
+
+  // ---------- 候选与搜索 ----------
 
   /**
    * 候选剪枝：只考虑与已有棋子切比雪夫距离 ≤ 2 的空点。
@@ -113,54 +179,21 @@
     return list;
   }
 
-  /**
-   * 假设 player 在 i 点落子，统计该方向上形成的棋型分值。
-   * 以 i 为中心向两侧数连续同色子，open 为两端空头的个数（出界或对方子视为被堵）。
-   * 间隔棋型（如 ●●_●）在评估空点本身时自然被算作高威胁，无需特判。
-   */
-  function dirShape(board, i, player, dr, dc) {
-    var r0 = (i / SIZE) | 0, c0 = i % SIZE;
-    var count = 1;
-    var open = 0;
-
-    for (var sign = -1; sign <= 1; sign += 2) {
-      var r = r0 + dr * sign, c = c0 + dc * sign;
-      while (inBoard(r, c) && board[idx(r, c)] === player) {
-        count += 1;
-        r += dr * sign; c += dc * sign;
-      }
-      if (inBoard(r, c) && board[idx(r, c)] === 0) open += 1;
+  /** 全部候选按 gain 从高到低排序。 */
+  function rankByGain(board, cands, player) {
+    var list = [];
+    for (var k = 0; k < cands.length; k++) {
+      list.push({ i: cands[k], g: gain(board, cands[k], player) });
     }
-
-    if (count >= 5) return SCORE.FIVE;
-    if (count === 4) return open === 2 ? SCORE.LIVE_FOUR : (open === 1 ? SCORE.RUSH_FOUR : 0);
-    if (count === 3) return open === 2 ? SCORE.LIVE_THREE : (open === 1 ? SCORE.SLEEP_THREE : 0);
-    if (count === 2) return open === 2 ? SCORE.LIVE_TWO : (open === 1 ? SCORE.SLEEP_TWO : 0);
-    if (count === 1) return open === 2 ? SCORE.LIVE_ONE : 0;
-    return 0; // 两端全被堵死的子没有发展
+    list.sort(function (a, b) { return b.g - a.g; });
+    return list;
   }
-
-  /** 假设 player 在 i 落子后的四方向棋型总分（进攻视角）。 */
-  function moveScore(board, i, player) {
-    var total = 0;
-    for (var d = 0; d < 4; d++) {
-      total += dirShape(board, i, player, DIRECTIONS[d][0], DIRECTIONS[d][1]);
-    }
-    return total;
-  }
-
-  /** 综合评估在 i 落子的价值：己方进攻分 + 对方在此落子的威胁分 × 防守权重。 */
-  function evalMove(board, i, player) {
-    return moveScore(board, i, player) + DEFENSE * moveScore(board, i, 3 - player);
-  }
-
-  var DEFENSE = 0.9;
 
   /** 收集 cands 里「落子即成五」的点。 */
   function fivePoints(board, cands, player) {
     var list = [];
     for (var k = 0; k < cands.length; k++) {
-      if (moveScore(board, cands[k], player) >= SCORE.FIVE) list.push(cands[k]);
+      if (pointScore(board, cands[k], player) >= SCORE.FIVE) list.push(cands[k]);
     }
     return list;
   }
@@ -189,42 +222,66 @@
   function mediumMove(board, player, cands, rng) {
     var best = -1, bestScore = -Infinity;
     for (var k = 0; k < cands.length; k++) {
-      var s = evalMove(board, cands[k], player) + rng() * 100;
+      var s = gain(board, cands[k], player) + rng() * 100;
       if (s > bestScore) { bestScore = s; best = cands[k]; }
     }
     return best;
   }
 
   /**
-   * 困难难度：在启发式前几名里做两层搜索——
-   * 我下 i 之后对手必然挑它收益最大的一手，用对手的最佳收益惩罚我的选择，
-   * 避免送出「我进一步、对方成大威胁」的坏棋。
+   * negamax 节点：返回轮到 player 走时 player 的最佳净值，
+   * α-β 剪枝。候选按「攻防合计分」排序（保证堵点进入分支），
+   * 但节点净值只累加「进攻分」——防守权重只是选择偏置，
+   * 若参与代数会把「对方不得不堵我」错算成对方的巨大收益，毒化整棵树。
+   * depth=0 时返回 0（净值只由路径上的进攻分构成）。
+   */
+  function negamax(board, player, depth, alpha, beta) {
+    if (depth === 0) return 0;
+    var cands = candidates(board);
+    if (cands.length === 0) return 0;
+
+    var ranked = rankByGain(board, cands, player);
+    var branch = Math.min(ranked.length, 8);
+    var best = -Infinity;
+
+    for (var k = 0; k < branch; k++) {
+      var m = ranked[k];
+      var attack = pointScore(board, m.i, player);
+      var v;
+      if (attack >= SCORE.FIVE) {
+        v = attack; // 一手成五，到此为止
+      } else {
+        board[m.i] = player;
+        v = attack - negamax(board, 3 - player, depth - 1, -beta, -alpha);
+        board[m.i] = 0;
+      }
+      if (v > best) best = v;
+      if (best > alpha) alpha = best;
+      if (alpha >= beta) break; // 剪枝
+    }
+    return best;
+  }
+
+  /**
+   * 困难难度：根节点取增益前 14 名做 3 层 negamax（我-对手-我），
+   * 能直接成五的点跳过搜索立即返回；同分候选用微小随机扰动打散。
    */
   function hardMove(board, player, cands, rng) {
-    var ranked = cands.map(function (i) {
-      return { i: i, s: evalMove(board, i, player) };
-    }).sort(function (a, b) { return b.s - a.s; });
-
-    var top = ranked.slice(0, 12);
-    var opp = 3 - player;
+    var top = rankByGain(board, cands, player).slice(0, 14);
     var best = -1, bestScore = -Infinity;
 
     for (var t = 0; t < top.length; t++) {
       var m = top[t];
-      board[m.i] = player;
-
-      var oppCands = candidates(board);
-      var oppBest = 0;
-      for (var k = 0; k < oppCands.length; k++) {
-        var v = evalMove(board, oppCands[k], opp);
-        if (v > oppBest) oppBest = v;
+      var v;
+      if (m.g >= SCORE.FIVE) {
+        v = m.g + SCORE.FIVE; // 直接赢，无需搜索
+      } else {
+        board[m.i] = player;
+        v = m.g - negamax(board, 3 - player, 2, -Infinity, Infinity);
+        board[m.i] = 0;
       }
-      board[m.i] = 0;
-
-      // 已能成五的选择无需再看对手
-      var s = m.s >= SCORE.FIVE ? m.s + SCORE.FIVE : m.s - oppBest;
-      s += rng() * 30;
-      if (s > bestScore) { bestScore = s; best = m.i; }
+      v += rng() * 30;
+      if (v > bestScore) { bestScore = v; best = m.i; }
     }
     return best;
   }
@@ -254,7 +311,7 @@
       // 多个堵点时挑一个顺带发展自己的
       var best = oppFive[0], bestScore = -1;
       for (var k = 0; k < oppFive.length; k++) {
-        var s = moveScore(board, oppFive[k], player) + rng() * 100;
+        var s = pointScore(board, oppFive[k], player) + rng() * 100;
         if (s > bestScore) { bestScore = s; best = oppFive[k]; }
       }
       return best;
@@ -273,7 +330,8 @@
     checkWin: checkWin,
     isBoardFull: isBoardFull,
     candidates: candidates,
-    moveScore: moveScore,
+    pointScore: pointScore,
+    gain: gain,
     findBestMove: findBestMove,
   };
 
