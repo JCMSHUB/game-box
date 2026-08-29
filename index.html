@@ -101,6 +101,15 @@
       border-style: dashed;
       opacity: 0.65;
     }
+
+    /* 卡片下方的战绩摘要行（无战绩时不显示） */
+    .stat-line {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--primary);
+    }
+
+    .stat-line:empty { display: none; }
   </style>
 </head>
 <body>
@@ -115,12 +124,14 @@
         <div class="icon">🔢</div>
         <h2>数独</h2>
         <p>三档难度 · 铅笔笔记 · 提示 · 撤销/重做 · 进度自动保存 · 深浅色主题</p>
+        <p class="stat-line" data-stats="sudoku"></p>
       </a>
 
       <a class="card" href="gomoku/">
         <div class="icon">⚫</div>
         <h2>五子棋</h2>
         <p>人机/双人 · 三档 AI · 悔棋/重做 · 提示 · 进度自动保存 · 深浅色主题</p>
+        <p class="stat-line" data-stats="gomoku"></p>
       </a>
 
       <div class="card add">
@@ -137,6 +148,39 @@
       window.toggleGameboxTheme();
       window.syncThemeLabel();
     });
+
+    // 卡片上的战绩摘要：读取各游戏自己的战绩键，没有战绩就留空
+    (function () {
+      function read(key) {
+        try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
+      }
+
+      var su = read('sudoku-stats-v1');
+      if (su) {
+        var total = 0;
+        ['easy', 'medium', 'hard'].forEach(function (k) {
+          total += (su[k] && su[k].count) || 0;
+        });
+        if (total > 0) {
+          document.querySelector('[data-stats="sudoku"]').textContent = '已通关 ' + total + ' 局';
+        }
+      }
+
+      var go = read('gomoku-stats-v1');
+      if (go && go.pve) {
+        var won = 0, lost = 0, drawn = 0;
+        ['easy', 'medium', 'hard'].forEach(function (k) {
+          var d = go.pve[k] || {};
+          won += d.won || 0;
+          lost += d.lost || 0;
+          drawn += d.drawn || 0;
+        });
+        if (won + lost + drawn > 0) {
+          document.querySelector('[data-stats="gomoku"]').textContent =
+            '人机 ' + won + '胜' + lost + '负' + (drawn ? ' ' + drawn + '和' : '');
+        }
+      }
+    })();
   </script>
 </body>
 </html>

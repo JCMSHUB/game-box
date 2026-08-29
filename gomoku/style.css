@@ -386,3 +386,49 @@ button.primary:hover { filter: brightness(1.15); }
 .confirm-btns button:hover { background: var(--surface-hover); }
 .confirm-btns button.primary { border: none; }
 .confirm-btns button.primary:hover { filter: brightness(1.15); background: var(--primary); }
+
+/* 确认弹层叠在战绩弹层之上（战绩里清空会二次确认） */
+#confirmOverlay { z-index: 20; }
+
+/* ---------- 战绩弹层 ---------- */
+
+.stats-card { min-width: 280px; }
+
+.stats-card h2 { margin: 0 0 16px; }
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.stats-table th {
+  color: var(--muted);
+  font-weight: normal;
+  font-size: 12px;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 6px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--line);
+}
+
+.stats-table tr:last-child td { border-bottom: none; }
+.stats-table th:first-child,
+.stats-table td:first-child { text-align: left; }
+
+.stats-section {
+  text-align: left;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 10px 0 6px;
+}
+
+.stats-empty {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 18px;
+}

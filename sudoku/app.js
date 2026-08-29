@@ -21,10 +21,11 @@
   var history = [];      // 撤销栈：存整个局面快照，简单且能覆盖多格联动变化
   var redoStack = [];    // 重做栈
   var paused = false;    // 暂停：停表并遮住棋盘
-  var pendingDiff = null; // 确认弹层期间记下要切到的难度
+  var confirmAction = null; // 确认弹层「确定」后要执行的动作
 
   var SAVE_KEY = 'sudoku-save-v1';
   var PREF_KEY = 'sudoku-pref-v1';
+  var STATS_KEY = 'sudoku-stats-v1';
 
   // ---------- DOM ----------
   var boardEl = document.getElementById('board');
@@ -43,6 +44,11 @@
   var confirmTextEl = document.getElementById('confirmText');
   var confirmOkBtn = document.getElementById('confirmOk');
   var confirmCancelBtn = document.getElementById('confirmCancel');
+  var statsBtn = document.getElementById('statsBtn');
+  var statsOverlayEl = document.getElementById('statsOverlay');
+  var statsContentEl = document.getElementById('statsContent');
+  var statsClearBtn = document.getElementById('statsClear');
+  var statsCloseBtn = document.getElementById('statsClose');
   var themeBtn = document.getElementById('themeBtn');
 
   // 创建 81 个格子，只建一次，之后只改内容和样式类。
@@ -124,28 +130,32 @@
     if (paused) resumeGame(); else pauseGame();
   }
 
-  // ---------- 切局二次确认 ----------
+  // ---------- 二次确认 ----------
   // 有进行中的进度时，开新局/切难度先弹确认，防止误触丢局
   function hasProgress() {
     return history.length > 0 || seconds > 0;
   }
 
-  function requestNewGame(diff) {
-    if (!finished && hasProgress()) {
-      pendingDiff = diff;
-      confirmTextEl.textContent = '正在进行「' + Sudoku.DIFFICULTY[difficulty].label +
-        '」对局，开新局后进度将丢失';
-      confirmOverlayEl.classList.remove('hidden');
-      return;
-    }
-    newGame(diff);
+  function askConfirm(text, action) {
+    confirmTextEl.textContent = text;
+    confirmAction = action;
+    confirmOverlayEl.classList.remove('hidden');
   }
 
   function settleConfirm(ok) {
-    var diff = pendingDiff;
-    pendingDiff = null;
+    var action = confirmAction;
+    confirmAction = null;
     confirmOverlayEl.classList.add('hidden');
-    if (ok && diff !== null) newGame(diff);
+    if (ok && action) action();
+  }
+
+  function requestNewGame(diff) {
+    if (!finished && hasProgress()) {
+      askConfirm('正在进行「' + Sudoku.DIFFICULTY[difficulty].label +
+        '」对局，开新局后进度将丢失', function () { newGame(diff); });
+      return;
+    }
+    newGame(diff);
   }
 
   // ---------- 撤销 / 重做 ----------
@@ -358,8 +368,55 @@
     }
     finished = true;
     stopTimer();
+    recordWin(); // 记入战绩
     clearSave(); // 通关后清掉存档，下次打开是新的一局
     playWinWave();
+  }
+
+  // ---------- 战绩统计 ----------
+  function loadStats() {
+    try {
+      var s = JSON.parse(localStorage.getItem(STATS_KEY));
+      return s && s.version === 1 ? s : { version: 1 };
+    } catch (e) {
+      return { version: 1 };
+    }
+  }
+
+  function saveStats(stats) {
+    try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch (e) {}
+  }
+
+  // 通关时记录：该难度通关数 +1，最佳用时取最小
+  function recordWin() {
+    var stats = loadStats();
+    var entry = stats[difficulty] || { count: 0, bestTime: 0 };
+    entry.count += 1;
+    if (!entry.bestTime || seconds < entry.bestTime) entry.bestTime = seconds;
+    stats[difficulty] = entry;
+    saveStats(stats);
+  }
+
+  function showStats() {
+    var stats = loadStats();
+    var total = 0;
+    var rows = '';
+    ['easy', 'medium', 'hard'].forEach(function (k) {
+      var e = stats[k];
+      var count = e ? e.count : 0;
+      total += count;
+      rows += '<tr><td>' + Sudoku.DIFFICULTY[k].label + '</td><td>' + count + '</td><td>' +
+        (e && e.bestTime ? formatTime(e.bestTime) : '—') + '</td></tr>';
+    });
+    statsContentEl.innerHTML = total === 0
+      ? '<p class="stats-empty">还没有通关记录，完成一局后会自动记录。</p>'
+      : '<table class="stats-table"><tr><th>难度</th><th>通关</th><th>最佳用时</th></tr>' + rows + '</table>';
+    statsOverlayEl.classList.remove('hidden');
+  }
+
+  function clearStats() {
+    try { localStorage.removeItem(STATS_KEY); } catch (e) {}
+    showStats(); // 清空后刷新弹层内容
   }
 
   // 通关动画：按扫雷数字配色给每格设置闪烁色（--flash），
@@ -511,6 +568,17 @@
     if (e.target === confirmOverlayEl) settleConfirm(false);
   });
 
+  statsBtn.addEventListener('click', showStats);
+  statsCloseBtn.addEventListener('click', function () {
+    statsOverlayEl.classList.add('hidden');
+  });
+  statsClearBtn.addEventListener('click', function () {
+    askConfirm('将清除全部通关记录，无法恢复', clearStats);
+  });
+  statsOverlayEl.addEventListener('click', function (e) {
+    if (e.target === statsOverlayEl) statsOverlayEl.classList.add('hidden');
+  });
+
   // 深浅色主题切换：逻辑在 shared/theme.js（主题键名统一为 gamebox-theme）
   themeBtn.addEventListener('click', function () {
     window.toggleGameboxTheme();
@@ -535,6 +603,12 @@
   });
 
   document.addEventListener('keydown', function (e) {
+    // 战绩弹层：Esc 关闭
+    if (!statsOverlayEl.classList.contains('hidden')) {
+      if (e.key === 'Escape') statsOverlayEl.classList.add('hidden');
+      return;
+    }
+
     // 切局确认弹层：回车确认开新局，Esc 取消
     if (!confirmOverlayEl.classList.contains('hidden')) {
       if (e.key === 'Enter') {

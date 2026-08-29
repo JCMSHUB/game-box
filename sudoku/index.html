@@ -19,6 +19,7 @@
         </div>
         <button id="newGame" class="primary">新游戏</button>
         <div class="timer" id="timer">00:00</div>
+        <button id="statsBtn" class="theme-btn" title="查看通关战绩">战绩</button>
         <button id="themeBtn" class="theme-btn" title="切换深浅色主题" aria-label="切换深浅色主题">🌙</button>
       </div>
     </header>
@@ -56,11 +57,22 @@
 
   <div class="overlay hidden" id="confirmOverlay">
     <div class="card">
-      <h2>放弃当前对局？</h2>
+      <h2>请确认</h2>
       <p id="confirmText">当前进度将被清除</p>
       <div class="confirm-btns">
-        <button id="confirmCancel">继续对局</button>
-        <button id="confirmOk" class="primary">开新局</button>
+        <button id="confirmCancel">取消</button>
+        <button id="confirmOk" class="primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="statsOverlay">
+    <div class="card stats-card">
+      <h2>📊 战绩</h2>
+      <div id="statsContent"></div>
+      <div class="confirm-btns">
+        <button id="statsClear">清空战绩</button>
+        <button id="statsClose" class="primary">关闭</button>
       </div>
     </div>
   </div>

@@ -28,8 +28,8 @@
 
   var SAVE_KEY = 'gomoku-save-v1';
   var PREF_KEY = 'gomoku-pref-v1';
-  var pendingMode = null; // 确认弹层期间记下要切到的模式/难度
-  var pendingDiff = null;
+  var STATS_KEY = 'gomoku-stats-v1';
+  var confirmAction = null; // 确认弹层「确定」后要执行的动作
 
   // ---------- DOM ----------
   var boardEl = document.getElementById('board');
@@ -49,6 +49,11 @@
   var confirmTextEl = document.getElementById('confirmText');
   var confirmOkBtn = document.getElementById('confirmOk');
   var confirmCancelBtn = document.getElementById('confirmCancel');
+  var statsBtn = document.getElementById('statsBtn');
+  var statsOverlayEl = document.getElementById('statsOverlay');
+  var statsContentEl = document.getElementById('statsContent');
+  var statsClearBtn = document.getElementById('statsClear');
+  var statsCloseBtn = document.getElementById('statsClose');
   var themeBtn = document.getElementById('themeBtn');
 
   // 创建 225 个格子，只建一次，之后只改内容和样式类
@@ -324,6 +329,7 @@
     finished = true;
     stopTimer();
     cancelAi();
+    recordResult(win); // 记入战绩
     clearSave(); // 终局后清掉存档，下次打开是新的一局
     winLine = win ? win.line : [];
     render();
@@ -362,26 +368,115 @@
     }
   }
 
-  // ---------- 切局二次确认 ----------
-  // 有进行中的进度时，开新局/切模式/切难度先弹确认，防止误触丢局
-  function requestNewGame(m, diff) {
-    if (!finished && moves.length > 0) {
-      pendingMode = m;
-      pendingDiff = diff;
-      confirmTextEl.textContent = '正在进行' + (mode === 'pve' ? '人机' : '双人') +
-        '对局，开新局后进度将丢失';
-      confirmOverlayEl.classList.remove('hidden');
-      return;
+  // ---------- 战绩统计 ----------
+  function loadStats() {
+    try {
+      var s = JSON.parse(localStorage.getItem(STATS_KEY));
+      return s && s.version === 1 ? s : {
+        version: 1,
+        pve: { easy: {}, medium: {}, hard: {} },
+        pvp: {},
+      };
+    } catch (e) {
+      return { version: 1, pve: { easy: {}, medium: {}, hard: {} }, pvp: {} };
     }
-    newGame(m, diff);
+  }
+
+  function saveStats(stats) {
+    try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch (e) {}
+  }
+
+  // 终局时记录：人机按难度累计胜/负/和，双人累计黑胜/白胜/和
+  function recordResult(win) {
+    var stats = loadStats();
+    if (mode === 'pve') {
+      var d = stats.pve[difficulty] || {};
+      d.played = (d.played || 0) + 1;
+      if (!win) {
+        d.drawn = (d.drawn || 0) + 1;
+      } else if (win.winner === playerColor) {
+        d.won = (d.won || 0) + 1;
+      } else {
+        d.lost = (d.lost || 0) + 1;
+      }
+      stats.pve[difficulty] = d;
+    } else {
+      var p = stats.pvp;
+      p.played = (p.played || 0) + 1;
+      if (!win) {
+        p.drawn = (p.drawn || 0) + 1;
+      } else if (win.winner === 1) {
+        p.blackWon = (p.blackWon || 0) + 1;
+      } else {
+        p.whiteWon = (p.whiteWon || 0) + 1;
+      }
+    }
+    saveStats(stats);
+  }
+
+  function statsHtml() {
+    var stats = loadStats();
+    var pveRows = '';
+    var pveTotal = 0;
+    ['easy', 'medium', 'hard'].forEach(function (k) {
+      var d = stats.pve[k] || {};
+      var played = d.played || 0;
+      pveTotal += played;
+      pveRows += '<tr><td>' + Gomoku.DIFFICULTY[k].label + '</td><td>' + played + '</td><td>' +
+        (d.won || 0) + '</td><td>' + (d.lost || 0) + '</td><td>' + (d.drawn || 0) + '</td></tr>';
+    });
+
+    var pvp = stats.pvp || {};
+    var html = '';
+    if (pveTotal === 0 && !(pvp.played > 0)) {
+      return '<p class="stats-empty">还没有对局记录，下一局后会自动记录。</p>';
+    }
+    if (pveTotal > 0) {
+      html += '<p class="stats-section">人机对战</p>' +
+        '<table class="stats-table"><tr><th>难度</th><th>对局</th><th>胜</th><th>负</th><th>和</th></tr>' +
+        pveRows + '</table>';
+    }
+    if (pvp.played > 0) {
+      html += '<p class="stats-section">双人对战</p>' +
+        '<table class="stats-table"><tr><th>对局</th><th>黑胜</th><th>白胜</th><th>和</th></tr>' +
+        '<tr><td>' + pvp.played + '</td><td>' + (pvp.blackWon || 0) + '</td><td>' +
+        (pvp.whiteWon || 0) + '</td><td>' + (pvp.drawn || 0) + '</td></tr></table>';
+    }
+    return html;
+  }
+
+  function showStats() {
+    statsContentEl.innerHTML = statsHtml();
+    statsOverlayEl.classList.remove('hidden');
+  }
+
+  function clearStats() {
+    try { localStorage.removeItem(STATS_KEY); } catch (e) {}
+    showStats(); // 清空后刷新弹层内容
+  }
+
+  // ---------- 二次确认 ----------
+  // 有进行中的进度时，开新局/切模式/切难度先弹确认，防止误触丢局
+  function askConfirm(text, action) {
+    confirmTextEl.textContent = text;
+    confirmAction = action;
+    confirmOverlayEl.classList.remove('hidden');
   }
 
   function settleConfirm(ok) {
-    var m = pendingMode, diff = pendingDiff;
-    pendingMode = null;
-    pendingDiff = null;
+    var action = confirmAction;
+    confirmAction = null;
     confirmOverlayEl.classList.add('hidden');
-    if (ok && m !== null) newGame(m, diff);
+    if (ok && action) action();
+  }
+
+  function requestNewGame(m, diff) {
+    if (!finished && moves.length > 0) {
+      askConfirm('正在进行' + (mode === 'pve' ? '人机' : '双人') +
+        '对局，开新局后进度将丢失', function () { newGame(m, diff); });
+      return;
+    }
+    newGame(m, diff);
   }
 
   // ---------- 新对局 ----------
@@ -486,6 +581,17 @@
     if (e.target === confirmOverlayEl) settleConfirm(false);
   });
 
+  statsBtn.addEventListener('click', showStats);
+  statsCloseBtn.addEventListener('click', function () {
+    statsOverlayEl.classList.add('hidden');
+  });
+  statsClearBtn.addEventListener('click', function () {
+    askConfirm('将清除全部对局记录，无法恢复', clearStats);
+  });
+  statsOverlayEl.addEventListener('click', function (e) {
+    if (e.target === statsOverlayEl) statsOverlayEl.classList.add('hidden');
+  });
+
   // 深浅色主题切换：逻辑在 shared/theme.js（主题键名统一为 gamebox-theme）
   themeBtn.addEventListener('click', function () {
     window.toggleGameboxTheme();
@@ -497,6 +603,12 @@
   hintBtn.addEventListener('click', hint);
 
   document.addEventListener('keydown', function (e) {
+    // 战绩弹层：Esc 关闭
+    if (!statsOverlayEl.classList.contains('hidden')) {
+      if (e.key === 'Escape') statsOverlayEl.classList.add('hidden');
+      return;
+    }
+
     // 切局确认弹层：回车确认开新局，Esc 取消
     if (!confirmOverlayEl.classList.contains('hidden')) {
       if (e.key === 'Enter') {
