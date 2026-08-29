@@ -20,8 +20,11 @@
   var hintsUsed = 0;     // 本局已用提示次数
   var history = [];      // 撤销栈：存整个局面快照，简单且能覆盖多格联动变化
   var redoStack = [];    // 重做栈
+  var paused = false;    // 暂停：停表并遮住棋盘
+  var pendingDiff = null; // 确认弹层期间记下要切到的难度
 
   var SAVE_KEY = 'sudoku-save-v1';
+  var PREF_KEY = 'sudoku-pref-v1';
 
   // ---------- DOM ----------
   var boardEl = document.getElementById('board');
@@ -33,6 +36,13 @@
   var redoBtn = document.getElementById('redoBtn');
   var hintBtn = document.getElementById('hintBtn');
   var notesBtn = document.getElementById('notesBtn');
+  var pauseBtn = document.getElementById('pauseBtn');
+  var pauseMaskEl = document.getElementById('pauseMask');
+  var resumeBtn = document.getElementById('resume');
+  var confirmOverlayEl = document.getElementById('confirmOverlay');
+  var confirmTextEl = document.getElementById('confirmText');
+  var confirmOkBtn = document.getElementById('confirmOk');
+  var confirmCancelBtn = document.getElementById('confirmCancel');
   var themeBtn = document.getElementById('themeBtn');
 
   // 创建 81 个格子，只建一次，之后只改内容和样式类。
@@ -90,6 +100,54 @@
     }
   }
 
+  // ---------- 暂停 ----------
+  function pauseGame() {
+    if (finished || paused) return;
+    paused = true;
+    stopTimer(); // seconds 保留，恢复时接着走
+    pauseMaskEl.classList.remove('hidden');
+    pauseBtn.textContent = '继续';
+    render();
+    saveGame();
+  }
+
+  function resumeGame() {
+    if (!paused) return;
+    paused = false;
+    pauseMaskEl.classList.add('hidden');
+    pauseBtn.textContent = '暂停';
+    startTimerFrom(seconds);
+    render();
+  }
+
+  function togglePause() {
+    if (paused) resumeGame(); else pauseGame();
+  }
+
+  // ---------- 切局二次确认 ----------
+  // 有进行中的进度时，开新局/切难度先弹确认，防止误触丢局
+  function hasProgress() {
+    return history.length > 0 || seconds > 0;
+  }
+
+  function requestNewGame(diff) {
+    if (!finished && hasProgress()) {
+      pendingDiff = diff;
+      confirmTextEl.textContent = '正在进行「' + Sudoku.DIFFICULTY[difficulty].label +
+        '」对局，开新局后进度将丢失';
+      confirmOverlayEl.classList.remove('hidden');
+      return;
+    }
+    newGame(diff);
+  }
+
+  function settleConfirm(ok) {
+    var diff = pendingDiff;
+    pendingDiff = null;
+    confirmOverlayEl.classList.add('hidden');
+    if (ok && diff !== null) newGame(diff);
+  }
+
   // ---------- 撤销 / 重做 ----------
   function snapshot() {
     return { board: board.slice(), notes: notes.slice() };
@@ -108,7 +166,7 @@
   }
 
   function undo() {
-    if (finished || history.length === 0) return;
+    if (finished || paused || history.length === 0) return;
     redoStack.push(snapshot());
     var s = history.pop();
     board = s.board;
@@ -118,7 +176,7 @@
   }
 
   function redo() {
-    if (finished || redoStack.length === 0) return;
+    if (finished || paused || redoStack.length === 0) return;
     history.push(snapshot());
     var s = redoStack.pop();
     board = s.board;
@@ -211,25 +269,36 @@
         selValue !== 0 && v === selValue && i !== selected);
     }
 
-    // 数字在棋盘上集齐 9 个（且都填对）→ 键盘按钮置灰不可选
+    // 数字键下方显示剩余个数；集齐 9 个（且都填对）→ 按钮置灰不可选
     for (var d = 1; d <= 9; d++) {
-      numBtns[d].classList.toggle('done', isDigitDone(d));
+      var done = isDigitDone(d);
+      numBtns[d].classList.toggle('done', done);
+      numBtns[d].querySelector('.left').textContent =
+        done ? '' : String(9 - placedCount(d));
     }
 
-    // 撤销/重做按钮的可用状态
-    undoBtn.disabled = history.length === 0;
-    redoBtn.disabled = redoStack.length === 0;
+    // 撤销/重做等按钮的可用状态（暂停期间全部禁用）
+    undoBtn.disabled = paused || history.length === 0;
+    redoBtn.disabled = paused || redoStack.length === 0;
+    hintBtn.disabled = paused;
+    notesBtn.disabled = paused;
+    pauseBtn.disabled = finished;
   }
 
   // ---------- 操作 ----------
   // 某个数字是否已用完：棋盘上出现 9 次且都和题解一致。
   // 有填错的格子时不计数，此时键盘按钮保持可用。
   function isDigitDone(d) {
+    return placedCount(d) === 9;
+  }
+
+  // 正确填入的数字 d 的个数
+  function placedCount(d) {
     var used = 0;
     for (var i = 0; i < 81; i++) {
       if (board[i] === d && board[i] === solution[i]) used++;
     }
-    return used === 9;
+    return used;
   }
 
   // 填入正式数字：清掉本格笔记；填对了顺手清掉同行/列/宫里该数字的笔记
@@ -251,7 +320,7 @@
 
   // 提示：优先填当前选中的错误/空格，否则随机挑一格，填入正确答案
   function hint() {
-    if (finished) return;
+    if (finished || paused) return;
     var candidates = [];
     for (var i = 0; i < 81; i++) {
       if (givens[i] === 0 && board[i] !== solution[i]) candidates.push(i);
@@ -325,6 +394,7 @@
 
   function newGame(diff) {
     difficulty = diff;
+    savePref(); // 记住难度，下次打开按偏好开局
     var game = Sudoku.generatePuzzle(diff);
     solution = game.solution;
     givens = game.puzzle;
@@ -335,6 +405,12 @@
     hintsUsed = 0;
     history.length = 0;
     redoStack.length = 0;
+    // 退出暂停态
+    paused = false;
+    pauseMaskEl.classList.add('hidden');
+    pauseBtn.textContent = '暂停';
+    notesMode = false;
+    notesBtn.classList.remove('active');
     // 清理可能还在播放的通关波浪
     if (waveTimerId !== null) {
       clearTimeout(waveTimerId);
@@ -346,19 +422,38 @@
       cells[w].style.removeProperty('animation-delay');
     }
     overlayEl.classList.add('hidden');
+    confirmOverlayEl.classList.add('hidden');
     syncDifficultyButtons();
     startTimerFrom(0);
     render();
     saveGame();
   }
 
+  // ---------- 难度偏好 ----------
+  function savePref() {
+    try {
+      localStorage.setItem(PREF_KEY, JSON.stringify({ version: 1, difficulty: difficulty }));
+    } catch (e) { /* 存储不可用（如隐私模式）时静默跳过 */ }
+  }
+
+  function loadPref() {
+    try {
+      var s = JSON.parse(localStorage.getItem(PREF_KEY));
+      return s && Sudoku.DIFFICULTY[s.difficulty] ? s.difficulty : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function toggleNotes() {
+    if (paused) return;
     notesMode = !notesMode;
     notesBtn.classList.toggle('active', notesMode);
   }
 
   // 数字键统一入口：n = 1-9 填数/记笔记，0 擦除
   function press(n) {
+    if (paused) return;
     if (selected < 0) return;
     if (givens[selected] !== 0) return; // 给定格锁定
 
@@ -383,8 +478,9 @@
 
   // ---------- 事件 ----------
   boardEl.addEventListener('click', function (e) {
+    if (paused) return;
     var cell = e.target.closest('.cell');
-    if (!cell) return;
+    if (!cell || e.target.closest('.pause-mask')) return;
     selected = Number(cell.dataset.i);
     render();
   });
@@ -396,11 +492,23 @@
   });
 
   document.getElementById('newGame').addEventListener('click', function () {
-    newGame(difficulty);
+    requestNewGame(difficulty);
   });
 
   againBtn.addEventListener('click', function () {
-    newGame(difficulty);
+    newGame(difficulty); // 终局弹层里再来一局，无需确认
+  });
+
+  pauseBtn.addEventListener('click', togglePause);
+  resumeBtn.addEventListener('click', resumeGame);
+  pauseMaskEl.addEventListener('click', function (e) {
+    if (e.target === pauseMaskEl) resumeGame(); // 点遮罩空白处继续
+  });
+
+  confirmOkBtn.addEventListener('click', function () { settleConfirm(true); });
+  confirmCancelBtn.addEventListener('click', function () { settleConfirm(false); });
+  confirmOverlayEl.addEventListener('click', function (e) {
+    if (e.target === confirmOverlayEl) settleConfirm(false);
   });
 
   // 深浅色主题切换：逻辑在 shared/theme.js（主题键名统一为 gamebox-theme）
@@ -417,11 +525,28 @@
   var diffBtns = document.querySelectorAll('.diff-btn');
   for (var d = 0; d < diffBtns.length; d++) {
     diffBtns[d].addEventListener('click', function (e) {
-      newGame(e.currentTarget.dataset.difficulty);
+      requestNewGame(e.currentTarget.dataset.difficulty);
     });
   }
 
+  // 切走标签页自动暂停，防止计时虚高
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) pauseGame();
+  });
+
   document.addEventListener('keydown', function (e) {
+    // 切局确认弹层：回车确认开新局，Esc 取消
+    if (!confirmOverlayEl.classList.contains('hidden')) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        settleConfirm(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        settleConfirm(false);
+      }
+      return;
+    }
+
     // 通关弹层打开时，回车/空格直接再来一局
     if (!overlayEl.classList.contains('hidden')) {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -444,6 +569,7 @@
     }
     if (e.key === 'n' || e.key === 'N') { toggleNotes(); return; }
     if (e.key === 'h' || e.key === 'H') { hint(); return; }
+    if (e.key === 'p' || e.key === 'P') { togglePause(); return; }
 
     if (e.key >= '1' && e.key <= '9') {
       press(Number(e.key));
@@ -478,7 +604,7 @@
   // ---------- 启动 ----------
   window.syncThemeLabel();
 
-  // 有存档就接着上次的玩，否则开一局新的
+  // 有存档就接着上次的玩，否则按上次难度偏好开一局新的
   if (loadSavedGame()) {
     finished = false;
     overlayEl.classList.add('hidden');
@@ -486,6 +612,6 @@
     startTimerFrom(seconds);
     render();
   } else {
-    newGame(difficulty);
+    newGame(loadPref() || difficulty);
   }
 })();

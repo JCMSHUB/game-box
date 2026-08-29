@@ -24,8 +24,12 @@
   var aiTimerId = null;  // AI 思考的延时器
   var winLine = [];      // 获胜连线上的格子
   var overlayTimerId = null;
+  var cursor = 7 * SIZE + 7; // 键盘虚拟光标，默认天元
 
   var SAVE_KEY = 'gomoku-save-v1';
+  var PREF_KEY = 'gomoku-pref-v1';
+  var pendingMode = null; // 确认弹层期间记下要切到的模式/难度
+  var pendingDiff = null;
 
   // ---------- DOM ----------
   var boardEl = document.getElementById('board');
@@ -35,11 +39,16 @@
   var overlayTitleEl = document.getElementById('overlayTitle');
   var overlayTextEl = document.getElementById('overlayText');
   var againBtn = document.getElementById('again');
+  var reviewBtn = document.getElementById('review');
   var undoBtn = document.getElementById('undoBtn');
   var redoBtn = document.getElementById('redoBtn');
   var hintBtn = document.getElementById('hintBtn');
   var modeGroupEl = document.getElementById('modeGroup');
   var diffGroupEl = document.getElementById('diffGroup');
+  var confirmOverlayEl = document.getElementById('confirmOverlay');
+  var confirmTextEl = document.getElementById('confirmText');
+  var confirmOkBtn = document.getElementById('confirmOk');
+  var confirmCancelBtn = document.getElementById('confirmCancel');
   var themeBtn = document.getElementById('themeBtn');
 
   // 创建 225 个格子，只建一次，之后只改内容和样式类
@@ -141,9 +150,11 @@
   }
 
   // ---------- 悔棋 / 重做 ----------
+  // 终局后也允许悔棋：回到局中继续下（复盘续战）
   function undo() {
-    if (finished || moves.length === 0) return;
+    if (moves.length === 0) return;
     cancelAi();
+    var wasFinished = finished;
     var steps = 1;
     if (mode === 'pve') {
       // 最后一手是 AI（轮到玩家）→ 一次退两步回到玩家落子前；
@@ -153,9 +164,22 @@
     steps = Math.min(steps, moves.length);
     while (steps-- > 0) redoMoves.push(moves.pop());
     rebuildFromMoves();
+
+    // 从终局回到局中：清掉连线高亮、恢复计时和存档
+    if (wasFinished) {
+      finished = false;
+      winLine = [];
+      boardEl.classList.remove('win');
+      for (var w = 0; w < TOTAL; w++) {
+        cells[w].style.removeProperty('animation-delay');
+      }
+      startTimerFrom(seconds);
+    }
+
     render();
     saveGame();
     updateStatus();
+    scheduleAiIfNeeded();
   }
 
   function redo() {
@@ -242,10 +266,12 @@
       cell.classList.toggle('empty', v === 0);
       cell.classList.toggle('last', i === lastMove);
       cell.classList.toggle('win-line', winLine.indexOf(i) !== -1);
+      cell.classList.toggle('cursor', i === cursor);
     }
 
-    undoBtn.disabled = finished || moves.length === 0;
-    redoBtn.disabled = finished || redoMoves.length === 0;
+    // 悔棋/重做终局后仍可用（复盘续战）；提示在终局后无意义
+    undoBtn.disabled = moves.length === 0;
+    redoBtn.disabled = redoMoves.length === 0;
     hintBtn.disabled = finished || isAiTurn();
   }
 
@@ -336,10 +362,33 @@
     }
   }
 
+  // ---------- 切局二次确认 ----------
+  // 有进行中的进度时，开新局/切模式/切难度先弹确认，防止误触丢局
+  function requestNewGame(m, diff) {
+    if (!finished && moves.length > 0) {
+      pendingMode = m;
+      pendingDiff = diff;
+      confirmTextEl.textContent = '正在进行' + (mode === 'pve' ? '人机' : '双人') +
+        '对局，开新局后进度将丢失';
+      confirmOverlayEl.classList.remove('hidden');
+      return;
+    }
+    newGame(m, diff);
+  }
+
+  function settleConfirm(ok) {
+    var m = pendingMode, diff = pendingDiff;
+    pendingMode = null;
+    pendingDiff = null;
+    confirmOverlayEl.classList.add('hidden');
+    if (ok && m !== null) newGame(m, diff);
+  }
+
   // ---------- 新对局 ----------
   function newGame(m, diff) {
     mode = m;
     difficulty = diff;
+    savePref(); // 记住模式和难度，下次打开按偏好开局
     board = Gomoku.createBoard();
     moves = [];
     redoMoves = [];
@@ -347,6 +396,7 @@
     lastMove = -1;
     finished = false;
     winLine = [];
+    cursor = 7 * SIZE + 7;
     cancelAi();
     if (overlayTimerId !== null) {
       clearTimeout(overlayTimerId);
@@ -357,6 +407,7 @@
       cells[w].style.removeProperty('animation-delay');
     }
     overlayEl.classList.add('hidden');
+    confirmOverlayEl.classList.add('hidden');
     syncButtons();
     startTimerFrom(0);
     render();
@@ -364,35 +415,75 @@
     saveGame();
   }
 
+  // ---------- 模式/难度偏好 ----------
+  function savePref() {
+    try {
+      localStorage.setItem(PREF_KEY, JSON.stringify({
+        version: 1,
+        mode: mode,
+        difficulty: difficulty,
+      }));
+    } catch (e) { /* 存储不可用（如隐私模式）时静默跳过 */ }
+  }
+
+  function loadPref() {
+    try {
+      var s = JSON.parse(localStorage.getItem(PREF_KEY));
+      if (!s) return null;
+      return {
+        mode: s.mode === 'pve' || s.mode === 'pvp' ? s.mode : null,
+        difficulty: Gomoku.DIFFICULTY[s.difficulty] ? s.difficulty : null,
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
   // ---------- 事件 ----------
+  // 落子统一入口（点击 / 键盘回车共用）：校验通过后在光标处落子
+  function playAt(i) {
+    if (finished || isAiTurn()) return;
+    if (board[i] !== 0) return;
+    cursor = i;
+    redoMoves.length = 0; // 新的一手让旧的重做分支作废
+    commitMove({ i: i, player: current });
+  }
+
   boardEl.addEventListener('click', function (e) {
     var cell = e.target.closest('.cell');
     if (!cell) return;
-    if (finished || isAiTurn()) return;
-    var i = Number(cell.dataset.i);
-    if (board[i] !== 0) return;
-    redoMoves.length = 0; // 新的一手让旧的重做分支作废
-    commitMove({ i: i, player: current });
+    playAt(Number(cell.dataset.i));
   });
 
   document.getElementById('newGame').addEventListener('click', function () {
-    newGame(mode, difficulty);
+    requestNewGame(mode, difficulty);
   });
 
   againBtn.addEventListener('click', function () {
-    newGame(mode, difficulty);
+    newGame(mode, difficulty); // 终局弹层里再来一局，无需确认
+  });
+
+  // 回顾棋局：只收起弹层，保留连线高亮，可继续悔棋复盘
+  reviewBtn.addEventListener('click', function () {
+    overlayEl.classList.add('hidden');
   });
 
   modeGroupEl.addEventListener('click', function (e) {
     var btn = e.target.closest('.diff-btn');
     if (!btn) return;
-    newGame(btn.dataset.mode, difficulty);
+    requestNewGame(btn.dataset.mode, difficulty);
   });
 
   diffGroupEl.addEventListener('click', function (e) {
     var btn = e.target.closest('.diff-btn');
     if (!btn) return;
-    newGame(mode, btn.dataset.difficulty);
+    requestNewGame(mode, btn.dataset.difficulty);
+  });
+
+  confirmOkBtn.addEventListener('click', function () { settleConfirm(true); });
+  confirmCancelBtn.addEventListener('click', function () { settleConfirm(false); });
+  confirmOverlayEl.addEventListener('click', function (e) {
+    if (e.target === confirmOverlayEl) settleConfirm(false);
   });
 
   // 深浅色主题切换：逻辑在 shared/theme.js（主题键名统一为 gamebox-theme）
@@ -406,11 +497,26 @@
   hintBtn.addEventListener('click', hint);
 
   document.addEventListener('keydown', function (e) {
-    // 胜负弹层打开时，回车/空格直接再来一局
+    // 切局确认弹层：回车确认开新局，Esc 取消
+    if (!confirmOverlayEl.classList.contains('hidden')) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        settleConfirm(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        settleConfirm(false);
+      }
+      return;
+    }
+
+    // 胜负弹层：回车/空格再来一局，Esc 回顾棋局
     if (!overlayEl.classList.contains('hidden')) {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         newGame(mode, difficulty);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        overlayEl.classList.add('hidden');
       }
       return;
     }
@@ -428,6 +534,18 @@
     }
     if (e.key === 'h' || e.key === 'H') {
       hint();
+      return;
+    }
+
+    // 方向键移动虚拟光标，回车/空格在光标处落子
+    var r = (cursor / SIZE) | 0, c = cursor % SIZE;
+    if (e.key === 'ArrowUp' && r > 0) { e.preventDefault(); cursor -= SIZE; render(); return; }
+    if (e.key === 'ArrowDown' && r < SIZE - 1) { e.preventDefault(); cursor += SIZE; render(); return; }
+    if (e.key === 'ArrowLeft' && c > 0) { e.preventDefault(); cursor -= 1; render(); return; }
+    if (e.key === 'ArrowRight' && c < SIZE - 1) { e.preventDefault(); cursor += 1; render(); return; }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      playAt(cursor);
     }
   });
 
@@ -437,7 +555,14 @@
   // ---------- 启动 ----------
   window.syncThemeLabel();
 
-  // 有存档就接着上次的下，否则开一局新的人机对局
+  // 按上次偏好恢复模式和难度
+  var pref = loadPref();
+  if (pref) {
+    if (pref.mode) mode = pref.mode;
+    if (pref.difficulty) difficulty = pref.difficulty;
+  }
+
+  // 有存档就接着上次的下，否则按偏好开一局新的
   if (loadSavedGame()) {
     finished = false;
     overlayEl.classList.add('hidden');

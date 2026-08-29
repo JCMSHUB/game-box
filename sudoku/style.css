@@ -155,6 +155,7 @@ button.primary:hover { filter: brightness(1.15); }
 /* ---------- 棋盘 ---------- */
 
 .board {
+  position: relative; /* 暂停遮罩的定位基准 */
   display: grid;
   grid-template-columns: repeat(9, 1fr);
   width: 100%;
@@ -166,6 +167,29 @@ button.primary:hover { filter: brightness(1.15); }
   user-select: none;
   touch-action: manipulation;
   box-shadow: var(--board-shadow);
+}
+
+/* 暂停遮罩：盖住整个棋盘防偷看，点击空白处或按钮继续 */
+.pause-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  cursor: pointer;
+}
+
+.pause-mask.hidden { display: none; }
+
+.pause-mask p {
+  margin: 0;
+  font-size: 17px;
+  color: var(--muted);
+  letter-spacing: 2px;
 }
 
 .cell {
@@ -254,7 +278,7 @@ button.primary:hover { filter: brightness(1.15); }
 
 .toolbar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   width: 100%;
 }
@@ -294,7 +318,12 @@ button.primary:hover { filter: brightness(1.15); }
 }
 
 .num {
-  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 8px 0;
   font-size: 20px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -304,6 +333,13 @@ button.primary:hover { filter: brightness(1.15); }
   font-variant-numeric: tabular-nums;
   transition: opacity 0.2s, background-color 0.25s ease, color 0.25s ease,
     border-color 0.25s ease;
+}
+
+/* 数字键下方的剩余个数小字 */
+.num .left {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
 }
 
 .num:hover { background: var(--peer); }
@@ -352,3 +388,24 @@ button.primary:hover { filter: brightness(1.15); }
 
 .card h2 { margin: 0 0 10px; font-size: 20px; }
 .card p { margin: 0 0 18px; color: var(--muted); }
+
+/* 切局确认弹层的双按钮 */
+.confirm-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.confirm-btns button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.confirm-btns button:hover { background: var(--surface-hover); }
+.confirm-btns button.primary { border: none; }
+.confirm-btns button.primary:hover { filter: brightness(1.15); background: var(--primary); }

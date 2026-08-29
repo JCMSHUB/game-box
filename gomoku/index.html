@@ -37,14 +37,28 @@
       <button id="hintBtn" class="tool" title="AI 推荐一个好点（H）">提示</button>
     </div>
 
-    <p class="hint">点击空位落子，黑方先行；人机模式你执黑，AI 执白。悔棋在人机模式一次退两步（含 AI 那手）；提示（H）用 AI 推荐一个好点，仅供参考；进度自动保存，刷新接着下；切换模式或难度开新局。</p>
+    <p class="hint">点击空位落子，黑方先行；人机模式你执黑，AI 执白；也可用方向键移动光标、回车落子。悔棋在人机模式一次退两步（含 AI 那手），终局后也可悔棋复盘续下；提示（H）用 AI 推荐一个好点，仅供参考；进度自动保存，刷新接着下；切换模式或难度开新局。</p>
   </main>
+
+  <div class="overlay hidden" id="confirmOverlay">
+    <div class="card">
+      <h2>放弃当前对局？</h2>
+      <p id="confirmText">当前进度将被清除</p>
+      <div class="confirm-btns">
+        <button id="confirmCancel">继续对局</button>
+        <button id="confirmOk" class="primary">开新局</button>
+      </div>
+    </div>
+  </div>
 
   <div class="overlay hidden" id="overlay">
     <div class="card">
       <h2 id="overlayTitle">🎉 黑方获胜</h2>
       <p id="overlayText">用时 00:00</p>
-      <button class="primary" id="again">再来一局</button>
+      <div class="confirm-btns">
+        <button id="review">回顾棋局</button>
+        <button class="primary" id="again">再来一局</button>
+      </div>
     </div>
   </div>
 

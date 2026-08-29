@@ -23,30 +23,47 @@
       </div>
     </header>
 
-    <div class="board" id="board" role="grid" aria-label="数独棋盘"></div>
+    <div class="board" id="board" role="grid" aria-label="数独棋盘">
+      <div class="pause-mask hidden" id="pauseMask">
+        <p>⏸ 已暂停</p>
+        <button id="resume" class="primary">继续</button>
+      </div>
+    </div>
 
     <div class="toolbar">
       <button id="undoBtn" class="tool" title="撤销（Ctrl/⌘+Z）">撤销</button>
       <button id="redoBtn" class="tool" title="重做（Ctrl/⌘+Shift+Z）">重做</button>
       <button id="hintBtn" class="tool" title="揭示一格正确答案（H）">提示</button>
       <button id="notesBtn" class="tool" title="铅笔笔记模式开关（N）">笔记</button>
+      <button id="pauseBtn" class="tool" title="暂停计时并遮住棋盘（P）">暂停</button>
     </div>
 
     <div class="numpad" id="numpad">
-      <button class="num" data-num="1">1</button>
-      <button class="num" data-num="2">2</button>
-      <button class="num" data-num="3">3</button>
-      <button class="num" data-num="4">4</button>
-      <button class="num" data-num="5">5</button>
-      <button class="num" data-num="6">6</button>
-      <button class="num" data-num="7">7</button>
-      <button class="num" data-num="8">8</button>
-      <button class="num" data-num="9">9</button>
+      <button class="num" data-num="1">1<span class="left"></span></button>
+      <button class="num" data-num="2">2<span class="left"></span></button>
+      <button class="num" data-num="3">3<span class="left"></span></button>
+      <button class="num" data-num="4">4<span class="left"></span></button>
+      <button class="num" data-num="5">5<span class="left"></span></button>
+      <button class="num" data-num="6">6<span class="left"></span></button>
+      <button class="num" data-num="7">7<span class="left"></span></button>
+      <button class="num" data-num="8">8<span class="left"></span></button>
+      <button class="num" data-num="9">9<span class="left"></span></button>
       <button class="num erase" data-num="0" aria-label="擦除">擦除</button>
     </div>
 
-    <p class="hint">点击选格，键盘 1–9 填数，Backspace 擦除，方向键移动；笔记模式（N）下按数字记铅笔小字；H 提示一格，Ctrl/⌘+Z 撤销；数字集齐 9 个后键盘置灰；进度自动保存，刷新页面接着玩；切换难度开新局。</p>
+    <p class="hint">点击选格，键盘 1–9 填数，Backspace 擦除，方向键移动；笔记模式（N）下按数字记铅笔小字；H 提示一格，P 暂停，Ctrl/⌘+Z 撤销；数字键下方是剩余个数，集齐后置灰；进度自动保存，刷新页面接着玩；切换难度开新局。</p>
   </main>
+
+  <div class="overlay hidden" id="confirmOverlay">
+    <div class="card">
+      <h2>放弃当前对局？</h2>
+      <p id="confirmText">当前进度将被清除</p>
+      <div class="confirm-btns">
+        <button id="confirmCancel">继续对局</button>
+        <button id="confirmOk" class="primary">开新局</button>
+      </div>
+    </div>
+  </div>
 
   <div class="overlay hidden" id="overlay">
     <div class="card">
