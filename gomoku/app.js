@@ -63,8 +63,6 @@
     cell.className = 'cell';
     cell.dataset.i = i;
     var r0 = (i / SIZE) | 0, c0 = i % SIZE;
-    if (c0 === SIZE - 1) cell.classList.add('last-col');
-    if (r0 === SIZE - 1) cell.classList.add('last-row');
     // 星位：四角星 + 天元
     if ((r0 === 3 || r0 === 11) && (c0 === 3 || c0 === 11)) cell.classList.add('star');
     if (r0 === 7 && c0 === 7) cell.classList.add('star');
