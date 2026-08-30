@@ -52,7 +52,8 @@
   var themeBtn = document.getElementById('themeBtn');
 
   // 创建 81 个格子，只建一次，之后只改内容和样式类。
-  // 3×3 宫的粗分隔线也在这里一次性定好。
+  // 3×3 宫的粗分隔线也在这里一次性定好；
+  // 棋盘格式的交替宫底色（alt）让棋盘不显得太平。
   var cells = [];
   for (var i = 0; i < 81; i++) {
     var cell = document.createElement('div');
@@ -63,6 +64,7 @@
     if (r0 % 3 === 2 && r0 !== 8) cell.classList.add('sep-b');
     if (c0 === 8) cell.classList.add('last-col');
     if (r0 === 8) cell.classList.add('last-row');
+    if ((((r0 / 3) | 0) + ((c0 / 3) | 0)) % 2 === 1) cell.classList.add('alt');
     boardEl.appendChild(cell);
     cells.push(cell);
   }
@@ -315,6 +317,15 @@
     return used;
   }
 
+  // 新填的数字弹一下，给输入一个即时的视觉反馈
+  function popCell(i) {
+    var cell = cells[i];
+    cell.classList.remove('pop');
+    void cell.offsetWidth; // 强制重排，同一格连续填写时动画能重新触发
+    cell.classList.add('pop');
+    setTimeout(function () { cell.classList.remove('pop'); }, 300);
+  }
+
   // 填入正式数字：清掉本格笔记；填对了顺手清掉同行/列/宫里该数字的笔记
   function placeDigit(i, d) {
     mutate(function () {
@@ -322,6 +333,7 @@
       notes[i] = 0;
       if (d === solution[i]) clearPeerNotes(i, d);
     });
+    popCell(i);
   }
 
   function eraseCell(i) {
@@ -350,6 +362,7 @@
       clearPeerNotes(pick, d);
       hintsUsed += 1;
     });
+    popCell(pick);
     cells[pick].classList.add('hinted');
     setTimeout(function () { cells[pick].classList.remove('hinted'); }, 1000);
   }

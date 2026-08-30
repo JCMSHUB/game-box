@@ -16,12 +16,14 @@
   --peer: #e0e7ff;           /* 选中格同行/列/宫 */
   --same: #c7d2fe;           /* 与选中格相同的数字 */
   --done: #dcf1e3;           /* 已填满且全部正确的行/列/宫 */
+  --box-alt: #f5f6fb;        /* 3×3 宫棋盘格式的交替底色 */
   --selected: #93c5fd;
   --selected-ring: #2563eb;
+  --selected-glow: rgba(37, 99, 235, 0.25);
   --primary: #2563eb;
   --card: #ffffff;           /* 通关弹层卡片 */
   --mask: rgba(24, 24, 27, 0.5);
-  --board-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+  --board-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 :root[data-theme="dark"] {
@@ -39,12 +41,14 @@
   --peer: #232c40;
   --same: #2b3654;
   --done: #24382e;
+  --box-alt: #252530;
   --selected: #1e3a5f;
   --selected-ring: #60a5fa;
+  --selected-glow: rgba(96, 165, 250, 0.35);
   --primary: #3b82f6;
   --card: #222228;
   --mask: rgba(0, 0, 0, 0.6);
-  --board-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+  --board-shadow: 0 6px 26px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -164,7 +168,7 @@ button.primary:hover { filter: brightness(1.15); }
   aspect-ratio: 1;
   background: var(--surface);
   border: 2px solid var(--strong);
-  border-radius: 4px;
+  border-radius: 12px;
   overflow: hidden;
   user-select: none;
   touch-action: manipulation;
@@ -200,7 +204,7 @@ button.primary:hover { filter: brightness(1.15); }
   justify-content: center;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  font-size: clamp(18px, 5vw, 26px);
+  font-size: clamp(20px, 5.5vw, 30px);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
@@ -213,8 +217,19 @@ button.primary:hover { filter: brightness(1.15); }
 .cell.sep-b { border-bottom: 2px solid var(--strong); }
 
 .cell.given { color: var(--text); font-weight: 700; }
-.cell.user { color: var(--user); }
+.cell.user { color: var(--user); font-weight: 600; }
 .cell.wrong { color: var(--wrong); }
+
+/* ---------- 格子背景分层（从低到高，写在后面的盖住前面的） ----------
+   交替宫底色 → 悬停 → 选中格同行/列/宫 → 同数字 → 已完成单元 → 选中格 */
+
+/* 3×3 宫棋盘格式的交替底色：比主底色深一点，让棋盘有层次 */
+.cell.alt { background: var(--box-alt); }
+
+/* 桌面端悬停淡色反馈（只盖过 alt，不影响各高亮态） */
+@media (hover: hover) {
+  .cell:hover { background: var(--surface-hover); }
+}
 
 /* 选中格所在行/列/宫淡色底 */
 .cell.peer { background: var(--peer); }
@@ -227,8 +242,17 @@ button.primary:hover { filter: brightness(1.15); }
 /* 写在最后，保证选中格的高亮盖过以上所有背景 */
 .cell.selected {
   background: var(--selected);
-  box-shadow: inset 0 0 0 2px var(--selected-ring);
+  box-shadow: inset 0 0 0 2px var(--selected-ring), 0 0 12px var(--selected-glow);
 }
+
+/* 新填的数字弹入一下（app.js 在落子时加 pop 类） */
+@keyframes digit-pop {
+  0% { transform: scale(0.5); opacity: 0.3; }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cell.pop { animation: digit-pop 0.28s ease-out; }
 
 /* 提示揭示的那一格闪一下 */
 @keyframes hint-pulse {
@@ -251,7 +275,7 @@ button.primary:hover { filter: brightness(1.15); }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(8px, 2vw, 11px);
+  font-size: clamp(9px, 2.2vw, 12px);
   line-height: 1;
   color: var(--muted);
 }
