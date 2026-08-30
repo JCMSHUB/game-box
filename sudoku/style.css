@@ -15,6 +15,7 @@
   --wrong: #dc2626;          /* 填错的数字 */
   --peer: #e0e7ff;           /* 选中格同行/列/宫 */
   --same: #c7d2fe;           /* 与选中格相同的数字 */
+  --done: #dcf1e3;           /* 已填满且全部正确的行/列/宫 */
   --selected: #93c5fd;
   --selected-ring: #2563eb;
   --primary: #2563eb;
@@ -37,6 +38,7 @@
   --wrong: #f87171;
   --peer: #232c40;
   --same: #2b3654;
+  --done: #24382e;
   --selected: #1e3a5f;
   --selected-ring: #60a5fa;
   --primary: #3b82f6;
@@ -218,7 +220,11 @@ button.primary:hover { filter: brightness(1.15); }
 .cell.peer { background: var(--peer); }
 /* 与选中格数字相同的格子 */
 .cell.same { background: var(--same); }
-/* 写在最后，保证选中格的高亮盖过 peer/same */
+/* 已填满且全部正确的行/列/宫：绿底提示「这块已完成」。
+   写在 peer/same 之后：完成态是持久信息，盖过选区的临时高亮，
+   这样补完最后一格的瞬间（选区还停在该单元里）也能立刻看到变绿。 */
+.cell.unit-done { background: var(--done); }
+/* 写在最后，保证选中格的高亮盖过以上所有背景 */
 .cell.selected {
   background: var(--selected);
   box-shadow: inset 0 0 0 2px var(--selected-ring);

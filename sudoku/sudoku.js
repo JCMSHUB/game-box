@@ -188,6 +188,24 @@
     return best; // 兜底：实际几乎不会走到
   }
 
+  /**
+   * 检查各行/列/宫是否已经「完成」：9 格全部填入且与题解一致。
+   * 有空格或填错的单元都算未完成（填错时该单元本来也凑不齐正确的 1-9）。
+   * 返回 { rows, cols, boxes }，各为长度 9 的布尔数组，true 表示该单元已完成。
+   */
+  function completedUnits(board, solution) {
+    var rows = new Array(9).fill(true);
+    var cols = new Array(9).fill(true);
+    var boxes = new Array(9).fill(true);
+    for (var i = 0; i < 81; i++) {
+      if (board[i] !== 0 && board[i] === solution[i]) continue;
+      rows[(i / 9) | 0] = false;
+      cols[i % 9] = false;
+      boxes[boxOf(i)] = false;
+    }
+    return { rows: rows, cols: cols, boxes: boxes };
+  }
+
   /** 检查一个填满的棋盘是否是合法终盘（每行/列/宫恰好是 1-9）。 */
   function isSolved(board) {
     for (var unit = 0; unit < 9; unit++) {
@@ -210,6 +228,7 @@
     generateSolution: generateSolution,
     generatePuzzle: generatePuzzle,
     isSolved: isSolved,
+    completedUnits: completedUnits,
   };
 
   root.Sudoku = Sudoku;

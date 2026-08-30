@@ -253,6 +253,7 @@
     var selCol = selected >= 0 ? selected % 9 : -1;
     var selBox = selected >= 0 ? boxOf(selected) : -1;
     var selValue = selected >= 0 ? board[selected] : 0;
+    var done = Sudoku.completedUnits(board, solution);
 
     for (var i = 0; i < 81; i++) {
       var cell = cells[i];
@@ -270,6 +271,9 @@
       cell.classList.toggle('user', givens[i] === 0 && v !== 0);
       // 与题解不符 → 红色（这必然也和同行/列/宫里的某个数冲突）
       cell.classList.toggle('wrong', givens[i] === 0 && v !== 0 && v !== solution[i]);
+      // 所在行/列/宫任一已全部填对 → 绿底，提示「这块已完成，不用再看」
+      cell.classList.toggle('unit-done',
+        done.rows[(i / 9) | 0] || done.cols[i % 9] || done.boxes[boxOf(i)]);
 
       cell.classList.toggle('selected', i === selected);
       cell.classList.toggle('peer',
