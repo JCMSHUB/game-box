@@ -282,7 +282,7 @@
         selected >= 0 && i !== selected &&
         ((i / 9 | 0) === selRow || i % 9 === selCol || boxOf(i) === selBox));
       cell.classList.toggle('same',
-        selValue !== 0 && v === selValue && i !== selected);
+        selValue !== 0 && v === selValue);
     }
 
     // 数字键下方显示剩余个数；集齐 9 个（且都填对）→ 按钮置灰不可选

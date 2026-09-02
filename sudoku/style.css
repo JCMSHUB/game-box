@@ -10,17 +10,16 @@
   --line: #d4d4d8;
   --strong: #3f3f46;         /* 3×3 宫粗线 */
   --text: #18181b;
+  --given: #334155;          /* 题面数字：柔和的深灰，避免大面积纯黑 */
   --muted: #71717a;
   --user: #2563eb;           /* 用户填的数字 */
   --wrong: #dc2626;          /* 填错的数字 */
-  --peer: #e0e7ff;           /* 选中格同行/列/宫 */
-  --same: #c7d2fe;           /* 与选中格相同的数字 */
+  --peer: #edf2f8;           /* 选中格同行/列/宫 */
+  --same: #dbeafe;           /* 与选中格相同的数字，包含选中格 */
   --same-digit: #1e40af;     /* 同数字格的数字颜色（配合底色一起强调） */
   --done: #dcf1e3;           /* 已填满且全部正确的行/列/宫 */
   --box-alt: #f5f6fb;        /* 3×3 宫棋盘格式的交替底色 */
-  --selected: #93c5fd;
-  --selected-ring: #2563eb;
-  --selected-glow: rgba(37, 99, 235, 0.25);
+  --selected-ring: #4f7db8;
   --primary: #2563eb;
   --card: #ffffff;           /* 通关弹层卡片 */
   --mask: rgba(24, 24, 27, 0.5);
@@ -36,17 +35,16 @@
   --line: #35353d;
   --strong: #6e6e77;
   --text: #f4f4f5;
+  --given: #d6dbe5;
   --muted: #a0a0ab;
   --user: #60a5fa;
   --wrong: #f87171;
-  --peer: #232c40;
-  --same: #34446e;
-  --same-digit: #bfdbfe;
+  --peer: #252d3b;
+  --same: #2b405e;
+  --same-digit: #c2dcff;
   --done: #24382e;
   --box-alt: #252530;
-  --selected: #1e3a5f;
-  --selected-ring: #60a5fa;
-  --selected-glow: rgba(96, 165, 250, 0.35);
+  --selected-ring: #86acd8;
   --primary: #3b82f6;
   --card: #222228;
   --mask: rgba(0, 0, 0, 0.6);
@@ -212,7 +210,9 @@ button.primary:hover { filter: brightness(1.15); }
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   font-size: clamp(20px, 5.8vw, 32px);
-  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -223,12 +223,12 @@ button.primary:hover { filter: brightness(1.15); }
 .cell.sep-r { border-right: 2px solid var(--strong); }
 .cell.sep-b { border-bottom: 2px solid var(--strong); }
 
-.cell.given { color: var(--text); font-weight: 700; }
-.cell.user { color: var(--user); font-weight: 700; }
+.cell.given { color: var(--given); }
+.cell.user { color: var(--user); }
 .cell.wrong { color: var(--wrong); }
 
 /* ---------- 格子背景分层（从低到高，写在后面的盖住前面的） ----------
-   交替宫底色 → 悬停 → 选中格同行/列/宫 → 同数字 → 已完成单元 → 选中格 */
+   交替宫底色 → 悬停 → 选中格同行/列/宫 → 已完成单元 → 同数字 → 选中格 */
 
 /* 3×3 宫棋盘格式的交替底色：比主底色深一点，让棋盘有层次 */
 .cell.alt { background: var(--box-alt); }
@@ -240,22 +240,21 @@ button.primary:hover { filter: brightness(1.15); }
 
 /* 选中格所在行/列/宫淡色底 */
 .cell.peer { background: var(--peer); }
-/* 与选中格数字相同的格子：底色 + 数字一起变色，一眼扫得到 */
+/* 完成态保留绿底，选中同数字时临时让位于统一高亮。 */
+.cell.unit-done { background: var(--done); }
+/* 所有同数字格（包括选中格）统一底色、文字颜色和字重。 */
 .cell.same {
   background: var(--same);
   color: var(--same-digit);
+  font-weight: 600;
 }
 
 /* 填错的格子即使数字恰好与选中格相同，也保持红色警示 */
 .cell.same.wrong { color: var(--wrong); }
-/* 已填满且全部正确的行/列/宫：绿底提示「这块已完成」。
-   写在 peer/same 之后：完成态是持久信息，盖过选区的临时高亮，
-   这样补完最后一格的瞬间（选区还停在该单元里）也能立刻看到变绿。 */
-.cell.unit-done { background: var(--done); }
-/* 写在最后，保证选中格的高亮盖过以上所有背景 */
+/* 选中格与同数字格共用底色，仅用细内描边标记当前输入位置。 */
 .cell.selected {
-  background: var(--selected);
-  box-shadow: inset 0 0 0 2px var(--selected-ring), 0 0 12px var(--selected-glow);
+  background: var(--same);
+  box-shadow: inset 0 0 0 1.5px var(--selected-ring);
 }
 
 /* 新填的数字弹入一下（app.js 在落子时加 pop 类） */
