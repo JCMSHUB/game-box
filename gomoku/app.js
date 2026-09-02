@@ -21,6 +21,7 @@
   var seconds = 0;
   var timerId = null;
   var finished = false;
+  var resultRecorded = false; // 每局只记录首次结果，复盘续下保留此标记
   var aiTimerId = null;  // AI 思考的延时器
   var winLine = [];      // 获胜连线上的格子
   var overlayTimerId = null;
@@ -217,6 +218,7 @@
         playerColor: playerColor,
         moves: moves,
         seconds: seconds,
+        resultRecorded: resultRecorded,
       }));
     } catch (e) { /* 存储不可用（如隐私模式）时静默跳过 */ }
   }
@@ -249,6 +251,7 @@
       current = moves.length ? 3 - moves[moves.length - 1].player : 1;
       lastMove = moves.length ? moves[moves.length - 1].i : -1;
       seconds = Number(s.seconds) || 0;
+      resultRecorded = s.resultRecorded === true; // 兼容没有此标记的旧存档
       return true;
     } catch (e) {
       return false;
@@ -272,13 +275,13 @@
       cell.classList.toggle('cursor', i === cursor);
     }
 
-    // 悔棋/重做终局后仍可用（复盘续战）；提示在终局后无意义
+    // 悔棋/重做终局后仍可用（复盘续战）
     undoBtn.disabled = moves.length === 0;
     redoBtn.disabled = redoMoves.length === 0;
-    hintBtn.disabled = finished || isAiTurn();
   }
 
   function updateStatus() {
+    hintBtn.disabled = finished || isAiTurn();
     boardEl.classList.toggle('turn-black', !finished && current === 1);
     boardEl.classList.toggle('turn-white', !finished && current === 2);
     boardEl.classList.toggle('locked', !finished && isAiTurn());
@@ -327,7 +330,10 @@
     finished = true;
     stopTimer();
     cancelAi();
-    recordResult(win); // 记入战绩
+    if (!resultRecorded) {
+      recordResult(win);
+      resultRecorded = true;
+    }
     clearSave(); // 终局后清掉存档，下次打开是新的一局
     winLine = win ? win.line : [];
     render();
@@ -488,6 +494,7 @@
     current = 1;
     lastMove = -1;
     finished = false;
+    resultRecorded = false;
     winLine = [];
     cursor = 7 * SIZE + 7;
     cancelAi();

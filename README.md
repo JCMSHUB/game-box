@@ -21,7 +21,8 @@ game-box/
     ├── style.css
     ├── gomoku.js   # 核心算法（胜负判定 + AI 走子），不依赖 DOM
     ├── app.js      # 界面与交互
-    └── test.js     # 算法自测：node test.js
+    ├── test.js     # 算法自测：node test.js
+    └── app.test.js # 交互回归检查：node app.test.js
 ```
 
 ## 本地运行
@@ -33,6 +34,18 @@ python3 -m http.server 8763 --directory game-box
 
 # 或者直接双击某个游戏的 index.html
 ```
+
+## 本地测试
+
+在项目根目录执行，无需安装依赖：
+
+```bash
+node sudoku/test.js       # 数独算法
+node gomoku/test.js       # 五子棋算法
+node gomoku/app.test.js   # 五子棋提示、复盘战绩与存档恢复
+```
+
+交互回归检查使用模拟页面、存储和定时器运行实际游戏脚本；发布前还需在浏览器中检查实际操作。
 
 ## 新增游戏的约定
 
